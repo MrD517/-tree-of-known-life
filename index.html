@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#08111f">
-<title>生命系統樹 β6 — Tree of Known Life</title>
+<title>生命系統樹 β7 — Tree of Known Life</title>
 <style>
   :root{
     --bg:#07101c; --panel:#0d1928; --panel2:#111f31; --line:#33516f;
@@ -178,7 +178,7 @@
 <body>
 <div id="app">
 <header>
-  <div class="brand">生命系統樹 <span class="muted">β6</span><small>Tree of Known Life — Catalogue of Life Explorer</small></div>
+  <div class="brand">生命系統樹 <span class="muted">β7</span><small>Tree of Known Life — Catalogue of Life Explorer</small></div>
   <div class="searchWrap">
     <input id="search" autocomplete="off" placeholder="和名・学名・英名で検索　例：シャチ / Orcinus orca / killer whale">
     <button id="searchBtn" title="検索">⌕</button>
@@ -240,7 +240,7 @@
       <li>系統樹の無名内部ノードは「A系統・B系統の分岐点」のような説明名を自動生成します。正式な学名ではありません。</li>
       <li>細菌・古細菌などでは水平遺伝子移動が多く、進化史は完全な一本の「木」で表せない場合があります。</li>
       <li>分岐年代は研究で推定値が得られる主要節のみ表示します。未確定の場所へ架空の数字は入れません。</li>
-      <li>和名・英名はデータベースに俗名がある場合のみ表示。カタカナ英名は既存表記が得られない場合、機械音写として明示します。</li>
+      <li>表示名は日本語優先です。Catalogue of Lifeに日本語俗名がある場合はノードを描く前に取得し、日本語が見つからない場合だけ学名を表示します。</li>
       <li>ウイルスは「生物か」の定義が議論されるため、CoLに含まれる分類は表示しますが生命樹上の扱いには注意が必要です。</li>
     </ol>
   </div>
@@ -509,6 +509,25 @@
     "Orcinus orca":"シャチ",
     "Tursiops":"ハンドウイルカ属",
     "Tursiops truncatus":"ハンドウイルカ",
+    "Homo habilis":"ホモ・ハビリス",
+    "Homo rudolfensis":"ホモ・ルドルフエンシス",
+    "Homo erectus":"ホモ・エレクトス",
+    "Homo ergaster":"ホモ・エルガスター",
+    "Homo antecessor":"ホモ・アンテセッサー",
+    "Homo heidelbergensis":"ハイデルベルク人",
+    "Homo neanderthalensis":"ネアンデルタール人",
+    "Homo floresiensis":"フローレス原人",
+    "Homo luzonensis":"ホモ・ルゾネンシス",
+    "Homo naledi":"ホモ・ナレディ",
+    "Homo longi":"竜人",
+    "Homo juluensis":"ホモ・ジュルエンシス",
+    "Denisova hominin":"デニソワ人",
+    "Australopithecus":"アウストラロピテクス属",
+    "Australopithecus afarensis":"アウストラロピテクス・アファレンシス",
+    "Australopithecus africanus":"アウストラロピテクス・アフリカヌス",
+    "Paranthropus":"パラントロプス属",
+    "Ardipithecus":"アルディピテクス属",
+    "Sahelanthropus":"サヘラントロプス属",
   };
 
   const JP_RANK = {
@@ -703,7 +722,7 @@
         if(n.raw?.taxon?.name){
           const sci=n.raw.taxon.name;
           n.name=sci;
-          n.common.ja=manualJa(sci) || null;
+          n.common.ja=n.common?.ja || manualJa(sci) || null;
         }else{
           n.name="系統分岐点";
           n.common.ja=phyloInternalLabel(n);
@@ -718,6 +737,7 @@
   }
 
   function japaneseFromUsage(x){
+    if(x?._ja) return x._ja;
     const arr = x?.vernacularNames || x?.vernacular || x?.commonNames || [];
     if(Array.isArray(arr)){
       const hit = arr.find(v=>{
@@ -843,6 +863,180 @@
     return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));
   }
 
+  const JP_CACHE_VERSION = "jp-v1";
+
+  function jpCacheKey(kind,idOrName){
+    return `lifeTree:${JP_CACHE_VERSION}:${DATASET}:${kind}:${String(idOrName||"")}`;
+  }
+
+  function getCachedJapanese(kind,idOrName){
+    try{
+      const v=localStorage.getItem(jpCacheKey(kind,idOrName));
+      if(v===null) return undefined;
+      if(v==="__NONE__") return null;
+      return v;
+    }catch(_){
+      return undefined;
+    }
+  }
+
+  function setCachedJapanese(kind,idOrName,value){
+    try{
+      localStorage.setItem(
+        jpCacheKey(kind,idOrName),
+        value ? String(value) : "__NONE__"
+      );
+    }catch(_){}
+  }
+
+  function findJapaneseVernacular(rows){
+    const arr=Array.isArray(rows) ? rows : listFrom(rows);
+    if(!arr.length) return null;
+
+    const byLang=arr.find(v=>{
+      const lang=vernLang(v);
+      return /^(ja|jpn|japanese)$/.test(lang) && !!vernName(v);
+    });
+    if(byLang) return vernName(byLang);
+
+    const byChars=arr.find(v=>hasJapanese(vernName(v)));
+    return byChars ? vernName(byChars) : null;
+  }
+
+  async function hydrateTaxonomyJapanese(n){
+    if(!n || n.placeholder || n.raw?.phylo) return;
+
+    const manual=manualJa(n.name);
+    if(manual){
+      n.common.ja=manual;
+      return;
+    }
+
+    if(n.common?.ja) return;
+
+    const id=getId(n.raw) || n.id;
+    if(!id || String(id).startsWith("virtual-")) return;
+
+    const cached=getCachedJapanese("taxon",id);
+    if(cached!==undefined){
+      if(cached) n.common.ja=cached;
+      return;
+    }
+
+    try{
+      const data=await fetchJSON(`${API}${DATASET}/taxon/${encodeURIComponent(id)}/vernacular`);
+      const jp=findJapaneseVernacular(data);
+      setCachedJapanese("taxon",id,jp);
+      if(jp) n.common.ja=jp;
+    }catch(e){
+      // Network errors are not cached as "none".
+      console.warn("vernacular lookup failed",id,e);
+    }
+  }
+
+  async function exactColUsageForScientificName(sci){
+    if(!sci) return null;
+
+    const cachedId=getCachedJapanese("sci-id",sci);
+    if(cachedId!==undefined){
+      if(!cachedId) return null;
+      return {id:cachedId, scientificName:sci};
+    }
+
+    try{
+      const data=await fetchJSON(
+        `${API}${DATASET}/nameusage/search?q=${encodeURIComponent(sci)}&content=SCIENTIFIC_NAME&type=exact&limit=6`
+      );
+      const rows=listFrom(data);
+      if(!rows.length){
+        setCachedJapanese("sci-id",sci,null);
+        return null;
+      }
+
+      const exact=rows.find(x=>(getName(x)||"").toLowerCase()===sci.toLowerCase()) || rows[0];
+      const id=getId(exact);
+      if(!id){
+        setCachedJapanese("sci-id",sci,null);
+        return null;
+      }
+
+      setCachedJapanese("sci-id",sci,String(id));
+      return exact;
+    }catch(e){
+      console.warn("scientific-name lookup failed",sci,e);
+      return null;
+    }
+  }
+
+  async function hydratePhyloJapanese(n){
+    if(!n || !n.raw?.phylo) return;
+
+    const sci=n.raw?.taxon?.name;
+    if(!sci){
+      n.common.ja=phyloInternalLabel(n);
+      return;
+    }
+
+    const manual=manualJa(sci);
+    if(manual){
+      n.common.ja=manual;
+      return;
+    }
+
+    if(n.common?.ja) return;
+
+    const cached=getCachedJapanese("sci-ja",sci);
+    if(cached!==undefined){
+      if(cached) n.common.ja=cached;
+      return;
+    }
+
+    const usage=await exactColUsageForScientificName(sci);
+    const id=getId(usage);
+    if(!id){
+      setCachedJapanese("sci-ja",sci,null);
+      return;
+    }
+
+    try{
+      const data=await fetchJSON(`${API}${DATASET}/taxon/${encodeURIComponent(id)}/vernacular`);
+      const jp=findJapaneseVernacular(data);
+      setCachedJapanese("sci-ja",sci,jp);
+      if(jp) n.common.ja=jp;
+    }catch(e){
+      console.warn("phylo vernacular lookup failed",sci,e);
+    }
+  }
+
+  async function hydrateJapaneseNodes(nodes,concurrency=8){
+    const arr=(nodes||[]).filter(Boolean);
+    if(!arr.length) return;
+
+    await mapLimit(arr,concurrency,async n=>{
+      if(n.raw?.phylo) await hydratePhyloJapanese(n);
+      else await hydrateTaxonomyJapanese(n);
+    });
+  }
+
+  function collectTreeNodes(root,max=160){
+    const out=[];
+    (function walk(n){
+      if(!n || out.length>=max) return;
+      out.push(n);
+      for(const c of (n.children||[])){
+        if(out.length>=max) break;
+        walk(c);
+      }
+    })(root);
+    return out;
+  }
+
+  async function hydrateJapaneseTree(root,max=160){
+    const nodes=collectTreeNodes(root,max);
+    await hydrateJapaneseNodes(nodes,8);
+    refreshPhyloLabels(root);
+  }
+
   function makeNode(raw, parent=null){
     const id = getId(raw) || ("virtual-"+crypto.randomUUID());
     const name = getName(raw) || manualJa(raw?.name) || "名称不明";
@@ -868,6 +1062,13 @@
     const cap=Math.min(MAX_CHILDREN,drawLimit||MAX_CHILDREN);
     n.hiddenCount=Math.max(0,arr.length-cap);
     n.children=arr.slice(0,cap).map(x=>makeNode(x,n));
+
+    // 表示前に日本語名を先読み。タップ後に名称が変わるのを防ぐ。
+    if(n.children.length){
+      setStatus(`${displayName(n)}：日本語名を確認中…`);
+      await hydrateJapaneseNodes(n.children,8);
+    }
+
     return n.children;
   }
 
@@ -914,7 +1115,9 @@
       state.roots=arr.map(x=>makeNode(x));
       state.selected=null;
 
-      // β6: 初期自動展開はしない。最上位ノードだけ表示。
+      await hydrateJapaneseNodes(state.roots,6);
+
+      // 初期自動展開はしない。最上位ノードだけ表示。
       for(const r of state.roots){
         r.children=null;
         r.expanded=false;
@@ -1199,9 +1402,8 @@
     const enName=en?vernName(en):"英名データなし";
     const kana=en?toKatakanaEnglish(vernName(en)):"—";
 
-    n.common={ja:jaResolved||null,en:en?vernName(en):null,kana:en?kana:null};
-    render();
-
+    // 詳細表示はノード名を変更しない。
+    // 表示名は枝を描く前の hydration で確定済み。
     document.getElementById("dJa").textContent=jaName;
     document.getElementById("dKana").textContent=en?`${kana}（カタカナ英名・自動音写）`:"カタカナ英名なし";
     document.getElementById("dEn").textContent=enName;
@@ -1376,6 +1578,27 @@
       }
       uniq.sort((x,y)=>searchScore(y,q)-searchScore(x,q));
       const shown=uniq.slice(0,30);
+
+      // 学名検索でも候補表示は最初から日本語優先。
+      await mapLimit(shown,8,async row=>{
+        if(japaneseFromUsage(row) || manualJa(getName(row))) return;
+        const id=getId(row);
+        if(!id) return;
+
+        const cached=getCachedJapanese("taxon",id);
+        if(cached!==undefined){
+          if(cached) row._ja=cached;
+          return;
+        }
+
+        try{
+          const vd=await fetchJSON(`${API}${DATASET}/taxon/${encodeURIComponent(id)}/vernacular`);
+          const jp=findJapaneseVernacular(vd);
+          setCachedJapanese("taxon",id,jp);
+          if(jp) row._ja=jp;
+        }catch(_){}
+      });
+
       showResults(shown,q);
       setStatus(`「${q}」：${uniq.length} 件の候補${uniq.length>30?"（上位30件を表示）":""}`);
 
@@ -1511,6 +1734,9 @@
       const jpHit=japaneseFromUsage(x);
       if(jpHit) chain[chain.length-1].common.ja=jpHit;
 
+      setStatus("分類経路の日本語名を確認中…");
+      await hydrateJapaneseNodes(chain,8);
+
       for(let i=0;i<chain.length-1;i++){
         chain[i].children=[chain[i+1]];
         chain[i].expanded=true;
@@ -1637,6 +1863,10 @@
 
       const root=attachPhyloLineage(arg,jpName);
       refreshPhyloLabels(root);
+
+      setStatus("系統樹の日本語名を確認中…");
+      await hydrateJapaneseTree(root,180);
+
       state.roots=[root];
 
       // find target node matching ott id
@@ -1679,6 +1909,8 @@
 
       const phyRoot=makePhyloNode(arg);
       refreshPhyloLabels(phyRoot);
+      await hydrateJapaneseNodes([phyRoot],4);
+      refreshPhyloLabels(phyRoot);
       phyRoot.expanded=false;
       state.roots=[phyRoot];
       state.selected=null;
@@ -1719,6 +1951,10 @@
 
       n.children=Array.isArray(arg.children)?arg.children.map(c=>makePhyloNode(c,n)):[];
       refreshPhyloLabels(n);
+
+      setStatus(`${displayName(n)}：日本語名を確認中…`);
+      await hydrateJapaneseTree(n,180);
+
       n.expanded=n.children.length>0;
       setStatus(`${displayName(n)}：系統樹を追加展開`);
     }catch(e){
