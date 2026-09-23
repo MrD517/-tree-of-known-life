@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#08111f">
-<title>生命系統樹 β16 — Tree of Known Life</title>
+<title>生命系統樹 β17 — Tree of Known Life</title>
 <style>
   :root{
     --bg:#07101c; --panel:#0d1928; --panel2:#111f31; --line:#33516f;
@@ -237,7 +237,7 @@
 <body>
 <div id="app">
 <header>
-  <div class="brand">生命系統樹 <span class="muted">β16</span><small>Tree of Known Life — Catalogue of Life Explorer</small></div>
+  <div class="brand">生命系統樹 <span class="muted">β17</span><small>Tree of Known Life — Catalogue of Life Explorer</small></div>
   <div class="searchWrap">
     <input id="search" autocomplete="off" placeholder="和名・学名・英名で検索　例：シャチ / Orcinus orca / killer whale">
     <button id="searchBtn" title="検索">⌕</button>
@@ -2100,6 +2100,11 @@
 
       render();
       fitTree();
+
+      if(!anyNodeOnScreen()){
+        focusNodeSafely(preferredFocusNode(),(innerWidth<=720)?0.78:0.88);
+      }
+
       setStatus(`最上位 ${state.roots.length} ノード。見たい枝だけ＋で展開`);
     }catch(e){
       console.error(e);
@@ -3260,8 +3265,15 @@
         state.transform={...state.taxonomySaved.transform};
         render();
         applyTransform();
+
+        const recovered=recoverCameraIfEmpty();
         renderGeoTimeline(state.selected);
-        setStatus("分類樹モード：Catalogue of Life");
+
+        setStatus(
+          recovered
+            ? "分類樹モード：Catalogue of Life（表示位置を復帰）"
+            : "分類樹モード：Catalogue of Life"
+        );
       }else{
         await loadRoots();
       }
@@ -3307,39 +3319,141 @@
 
     semanticRelayout(nk,cx,cy,anchorAge,anchorBaseY);
   }
+  function preferredFocusNode(){
+    if(state.selected) return state.selected;
+
+    // Classification mode: Eukaryota is the most useful starting point
+    // for ordinary exploration. Otherwise use the first real root.
+    if(state.mode==="taxonomy"){
+      const euk=state.roots.find(n=>
+        String(n.name||"").toLowerCase()==="eukaryota"
+      );
+      if(euk) return euk;
+    }
+
+    return state.roots.find(n=>!n.placeholder) || state.roots[0] || null;
+  }
+
+  function nodeIsOnScreen(n,margin=80){
+    if(!n || !Number.isFinite(n._x) || !Number.isFinite(n._y)) return false;
+
+    const x=state.transform.x+(n._x+NODE_W/2)*state.transform.k;
+    const y=state.transform.y+(n._y+NODE_H/2)*state.transform.k;
+
+    return x>=-margin &&
+      x<=svg.clientWidth+margin &&
+      y>=88-margin &&
+      y<=svg.clientHeight+margin;
+  }
+
+  function anyNodeOnScreen(){
+    return flattenVisible().some(({n})=>nodeIsOnScreen(n,40));
+  }
+
+  function focusNodeSafely(n,desiredK=null){
+    if(!n) return;
+
+    if(Number.isFinite(desiredK)){
+      state.transform.k=Math.max(.10,Math.min(5,desiredK));
+    }
+
+    // Critical for β15+: positions themselves depend on k.
+    render();
+
+    state.transform.x=
+      svg.clientWidth/2-(n._x+NODE_W/2)*state.transform.k;
+
+    const usableCenter=88+(svg.clientHeight-88)/2;
+    state.transform.y=
+      usableCenter-(n._y+NODE_H/2)*state.transform.k;
+
+    applyTransform();
+  }
+
+  function recoverCameraIfEmpty(){
+    if(anyNodeOnScreen()) return false;
+
+    const target=preferredFocusNode();
+    if(!target) return false;
+
+    const k=(innerWidth<=720)?0.78:0.88;
+    focusNodeSafely(target,k);
+    return true;
+  }
+
   function fitTree(){
-    const nodes=flattenVisible().map(x=>x.n);
-    if(!nodes.length) return;
+    const target=preferredFocusNode();
+    if(!target) return;
 
-    const minX=Math.min(...nodes.map(n=>n._x));
-    const maxX=Math.max(...nodes.map(n=>n._x+NODE_W+36));
-    const minY=Math.min(...nodes.map(n=>n._y));
-    const maxY=Math.max(...nodes.map(n=>n._y+NODE_H));
-
-    const w=Math.max(1,maxX-minX);
-    const h=Math.max(1,maxY-minY);
     const sidePad=36, topPad=108, bottomPad=50;
     const aw=Math.max(100,svg.clientWidth-sidePad*2);
     const ah=Math.max(100,svg.clientHeight-topPad-bottomPad);
-
-    const natural=Math.min(aw/w,ah/h);
-
-    // Important: "fit" no longer crushes nodes into dust.
-    // On a huge tree we show a readable window and let the user pan.
     const readableFloor=(innerWidth<=720)?0.72:0.82;
-    const k=Math.min(1.25,Math.max(readableFloor,natural));
+
+    let k=Math.max(readableFloor,Math.min(1.0,state.transform.k||.8));
+    let natural=0;
+
+    // Semantic spacing depends on k, so estimate a stable fit iteratively.
+    for(let i=0;i<3;i++){
+      state.transform.k=k;
+      computeLayout();
+
+      const nodes=flattenVisible().map(x=>x.n);
+      const minX=Math.min(...nodes.map(n=>n._x));
+      const maxX=Math.max(...nodes.map(n=>n._x+NODE_W+36));
+      const minY=Math.min(...nodes.map(n=>n._y));
+      const maxY=Math.max(...nodes.map(n=>n._y+NODE_H));
+
+      const w=Math.max(1,maxX-minX);
+      const h=Math.max(1,maxY-minY);
+
+      natural=Math.min(aw/w,ah/h);
+
+      if(natural>=readableFloor){
+        k=Math.min(1.25,Math.max(readableFloor,natural));
+      }else{
+        k=readableFloor;
+        break;
+      }
+    }
+
+    // Huge semantic timelines cannot physically fit while keeping readable boxes.
+    // In that case show an actual node, not the empty midpoint between remote roots.
+    if(natural<readableFloor){
+      focusNodeSafely(target,readableFloor);
+      return;
+    }
 
     state.transform.k=k;
-    state.transform.x=svg.clientWidth/2-((minX+maxX)/2)*k;
+    render();
+
+    const nodes=flattenVisible().map(x=>x.n);
+    const minX=Math.min(...nodes.map(n=>n._x));
+    const maxX=Math.max(...nodes.map(n=>n._x+NODE_W+36));
+    const minY=Math.min(...nodes.map(n=>n._y));
+
+    state.transform.x=
+      svg.clientWidth/2-((minX+maxX)/2)*k;
     state.transform.y=topPad-minY*k;
     applyTransform();
+
+    // Last-resort guard against a blank viewport.
+    recoverCameraIfEmpty();
   }
 
   function centerNode(n,animate=true){
     if(!n)return;
-    state.transform.x=svg.clientWidth/2-(n._x+NODE_W/2)*state.transform.k;
+
+    // n._x/_y may belong to a layout made at another semantic zoom level.
+    render();
+
+    state.transform.x=
+      svg.clientWidth/2-(n._x+NODE_W/2)*state.transform.k;
+
     const usableCenter=88+(svg.clientHeight-88)/2;
-    state.transform.y=usableCenter-(n._y+NODE_H/2)*state.transform.k;
+    state.transform.y=
+      usableCenter-(n._y+NODE_H/2)*state.transform.k;
+
     applyTransform();
   }
 
@@ -3520,7 +3634,10 @@
     state.taxonomySaved=null;
     if(state.mode==="taxonomy") loadRoots();
   };
-  window.addEventListener("resize",()=>{render();});
+  window.addEventListener("resize",()=>{
+    render();
+    recoverCameraIfEmpty();
+  });
 
   window.addEventListener("error",ev=>{
     console.error("global runtime error",ev.error || ev.message);
