@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#08111f">
-<title>生命系統樹 — Tree of Known Life</title>
+<title>生命系統樹 β2 — Tree of Known Life</title>
 <style>
   :root{
     --bg:#07101c; --panel:#0d1928; --panel2:#111f31; --line:#33516f;
@@ -128,9 +128,9 @@
 <body>
 <div id="app">
 <header>
-  <div class="brand">生命系統樹 <span class="muted">β</span><small>Tree of Known Life — Catalogue of Life Explorer</small></div>
+  <div class="brand">生命系統樹 <span class="muted">β2</span><small>Tree of Known Life — Catalogue of Life Explorer</small></div>
   <div class="searchWrap">
-    <input id="search" placeholder="和名・英名・学名で検索　例：シャチ / killer whale / Orcinus orca">
+    <input id="search" placeholder="和名・学名・英名で検索　例：シャチ / Orcinus orca / killer whale">
     <button id="searchBtn" title="検索">⌕</button>
   </div>
   <div class="topBtns">
@@ -172,10 +172,10 @@
   <div class="section">
     <h3>表示</h3>
     <div class="switchLine">
-      <button id="expand2">選択枝を2段展開</button>
+      <button id="expand2">選択枝をさらに展開</button>
       <button id="collapseBtn">選択枝を畳む</button>
     </div>
-    <div class="tiny muted" style="margin-top:7px">巨大な科・属では描画数を自動制限します。検索すれば非表示分にも直接飛べます。</div>
+    <div class="tiny muted" style="margin-top:7px">起動時は主要枝を自動展開します。大量に分岐する場所だけ端末保護のため途中で止め、検索なら全件へ直接飛べます。</div>
   </div>
 
   <div class="section footnotes">
@@ -305,6 +305,171 @@
     "southern":"サザン","western":"ウェスタン","eastern":"イースタン"
   };
 
+
+  // 日本語表示を最優先するための主要分類群辞書。
+  // CoLの俗名APIで日本語名が得られる場合は、そちらをさらに優先する。
+  const JP_TAXON = {
+    "Life":"生命",
+    "Archaea":"古細菌",
+    "Bacteria":"細菌",
+    "Eukaryota":"真核生物",
+    "Viruses":"ウイルス",
+    "incertae sedis":"所属不明",
+    "Animalia":"動物界",
+    "Metazoa":"動物",
+    "Fungi":"菌界",
+    "Plantae":"植物界",
+    "Viridiplantae":"緑色植物",
+    "Opisthokonta":"オピストコンタ",
+    "Amoebozoa":"アメーボゾア",
+    "Archaeplastida":"アーケプラスチダ",
+    "SAR":"SARスーパーグループ",
+    "Stramenopiles":"ストラメノパイル",
+    "Alveolata":"アルベオラータ",
+    "Rhizaria":"リザリア",
+    "Excavata":"エクスカバータ",
+    "Bilateria":"左右相称動物",
+    "Protostomia":"前口動物",
+    "Deuterostomia":"後口動物",
+    "Chordata":"脊索動物門",
+    "Vertebrata":"脊椎動物",
+    "Gnathostomata":"顎口類",
+    "Tetrapoda":"四肢動物",
+    "Amniota":"羊膜類",
+    "Mammalia":"哺乳綱",
+    "Aves":"鳥綱",
+    "Reptilia":"爬虫綱",
+    "Amphibia":"両生綱",
+    "Actinopterygii":"条鰭綱",
+    "Sarcopterygii":"肉鰭綱",
+    "Chondrichthyes":"軟骨魚綱",
+    "Cyclostomata":"円口類",
+    "Arthropoda":"節足動物門",
+    "Insecta":"昆虫綱",
+    "Arachnida":"クモ綱",
+    "Crustacea":"甲殻類",
+    "Mollusca":"軟体動物門",
+    "Gastropoda":"腹足綱",
+    "Bivalvia":"二枚貝綱",
+    "Cephalopoda":"頭足綱",
+    "Annelida":"環形動物門",
+    "Nematoda":"線形動物門",
+    "Platyhelminthes":"扁形動物門",
+    "Cnidaria":"刺胞動物門",
+    "Porifera":"海綿動物門",
+    "Echinodermata":"棘皮動物門",
+    "Bryozoa":"外肛動物門",
+    "Ctenophora":"有櫛動物門",
+    "Rotifera":"輪形動物門",
+    "Tardigrada":"緩歩動物門",
+    "Onychophora":"有爪動物門",
+    "Hemichordata":"半索動物門",
+    "Embryophyta":"陸上植物",
+    "Tracheophyta":"維管束植物",
+    "Spermatophyta":"種子植物",
+    "Gymnospermae":"裸子植物",
+    "Magnoliophyta":"被子植物",
+    "Angiospermae":"被子植物",
+    "Bryophyta":"コケ植物",
+    "Marchantiophyta":"苔類",
+    "Anthocerotophyta":"ツノゴケ類",
+    "Lycopodiophyta":"小葉植物",
+    "Polypodiopsida":"シダ綱",
+    "Pinophyta":"マツ門",
+    "Chlorophyta":"緑藻植物門",
+    "Rhodophyta":"紅色植物門",
+    "Glaucophyta":"灰色植物門",
+    "Ascomycota":"子嚢菌門",
+    "Basidiomycota":"担子菌門",
+    "Mucoromycota":"ケカビ門",
+    "Chytridiomycota":"ツボカビ門"
+  };
+
+  const JP_RANK = {
+    "root":"根",
+    "domain":"ドメイン",
+    "superkingdom":"上界",
+    "kingdom":"界",
+    "subkingdom":"亜界",
+    "infrakingdom":"下界",
+    "superphylum":"上門",
+    "phylum":"門",
+    "subphylum":"亜門",
+    "infraphylum":"下門",
+    "superclass":"上綱",
+    "class":"綱",
+    "subclass":"亜綱",
+    "infraclass":"下綱",
+    "cohort":"コホート",
+    "superorder":"上目",
+    "order":"目",
+    "suborder":"亜目",
+    "infraorder":"下目",
+    "parvorder":"小目",
+    "superfamily":"上科",
+    "family":"科",
+    "subfamily":"亜科",
+    "tribe":"族",
+    "subtribe":"亜族",
+    "genus":"属",
+    "subgenus":"亜属",
+    "section":"節",
+    "subsection":"亜節",
+    "series":"列",
+    "species":"種",
+    "subspecies":"亜種",
+    "variety":"変種",
+    "form":"品種",
+    "clade":"系統群",
+    "unranked":"階級なし",
+    "":"階級なし"
+  };
+
+  const JP_STATUS = {
+    "accepted":"受容名",
+    "provisionally accepted":"暫定受容名",
+    "synonym":"異名",
+    "ambiguous synonym":"曖昧な異名",
+    "misapplied":"誤用名",
+    "bare name":"未配置名"
+  };
+
+  function rankJa(r){
+    r=String(r||"").toLowerCase();
+    return JP_RANK[r] || r || "階級なし";
+  }
+
+  function statusJa(v){
+    const k=String(v||"").toLowerCase();
+    return JP_STATUS[k] || v || "—";
+  }
+
+  function manualJa(name){
+    return JP_TAXON[String(name||"")] || null;
+  }
+
+  function displayName(n){
+    return n?.common?.ja || manualJa(n?.name) || n?.name || "—";
+  }
+
+  function hasJapanese(s){
+    return /[ぁ-んァ-ヶ一-龯々]/.test(String(s||""));
+  }
+
+  function japaneseFromUsage(x){
+    const arr = x?.vernacularNames || x?.vernacular || x?.commonNames || [];
+    if(Array.isArray(arr)){
+      const hit = arr.find(v=>{
+        const lang=vernLang(v);
+        const name=vernName(v);
+        return /^(ja|jpn|japanese)$/.test(lang) || hasJapanese(name);
+      });
+      if(hit) return vernName(hit);
+    }
+    const direct=x?.vernacularName || x?.commonName;
+    return hasJapanese(direct) ? stripHtml(direct) : null;
+  }
+
   const state = {
     roots:[],
     selected:null,
@@ -345,7 +510,8 @@
 
   function getId(o){
     if(!o) return null;
-    return o.id ?? o.ID ?? o.taxonID ?? o.taxonId ?? o.key ?? o.usageKey ?? o.nameUsageId ?? null;
+    return o.id ?? o.ID ?? o.taxonID ?? o.taxonId ?? o.taxon?.id ?? o.taxon?.ID ??
+      o.usage?.id ?? o.usage?.ID ?? o.key ?? o.usageKey ?? o.nameUsageId ?? o.nameUsageID ?? null;
   }
   function getName(o){
     if(!o) return "—";
@@ -371,12 +537,60 @@
       rank:getRank(raw), status:getStatus(raw),
       children:null, expanded:false, loading:false,
       placeholder:!!(raw.placeholder || raw.virtual || raw.isPlaceholder),
-      hiddenCount:0, common:null
+      hiddenCount:0,
+      common:{ja:manualJa(name),en:null,kana:null}
     };
   }
 
+  async function ensureChildren(n, drawLimit=MAX_CHILDREN){
+    if(!n || n.placeholder) return [];
+    if(n.children!==null) return n.children;
+    const data=await fetchJSON(`${API}${DATASET}/tree/${encodeURIComponent(n.id)}/children?insertPlaceholder=true`);
+    let arr=listFrom(data);
+    if(!arr.length && data && typeof data==="object"){
+      const vals=Object.values(data).filter(v=>v && typeof v==="object" && getId(v));
+      if(vals.length) arr=vals;
+    }
+    const cap=Math.min(MAX_CHILDREN,drawLimit||MAX_CHILDREN);
+    n.hiddenCount=Math.max(0,arr.length-cap);
+    n.children=arr.slice(0,cap).map(x=>makeNode(x,n));
+    return n.children;
+  }
+
+  async function mapLimit(items, limit, fn){
+    let i=0;
+    const workers=Array.from({length:Math.min(limit,items.length)},async()=>{
+      while(i<items.length){
+        const idx=i++;
+        try{ await fn(items[idx],idx); }catch(e){ console.warn(e); }
+      }
+    });
+    await Promise.all(workers);
+  }
+
+  async function autoOpenInitial(){
+    // 「全部開いている感じ」を出しつつ、数百万ノード一括描画は避ける。
+    // 1) 全ルートを開く
+    await mapLimit(state.roots.filter(n=>!n.placeholder),4,async n=>{
+      await ensureChildren(n,MAX_CHILDREN);
+      n.expanded=true;
+    });
+
+    // 2) 子が少ないルートだけ、さらに一段自動展開。
+    // Eukaryotaのような主要枝は最初から枝分かれが見える。
+    const second=[];
+    for(const r of state.roots){
+      const kids=r.children||[];
+      if(kids.length && kids.length<=24) second.push(...kids);
+    }
+    await mapLimit(second.slice(0,55),6,async n=>{
+      const kids=await ensureChildren(n,120);
+      n.expanded=kids.length>0;
+    });
+  }
+
   async function loadRoots(){
-    showLoading(true,"生命の根元を取得中…");
+    showLoading(true,"生命の主要枝を展開中…");
     setStatus("Catalogue of Life に接続中…");
     try{
       const data=await fetchJSON(`${API}${DATASET}/tree`);
@@ -385,8 +599,12 @@
       state.roots=arr.map(x=>makeNode(x));
       state.selected=null;
       render();
+      setStatus("主要枝を自動展開しています…");
+      await autoOpenInitial();
+      render();
       fitTree();
-      setStatus(`根ノード ${state.roots.length} 件。＋で枝を展開`);
+      const visible=flattenVisible().length;
+      setStatus(`主要枝を自動展開済み：表示 ${visible} ノード。大量分岐は途中で止めています`);
     }catch(e){
       console.error(e);
       setStatus("APIへ接続できません。ネット接続/CORSを確認してください。デモ樹を表示します。");
@@ -396,7 +614,7 @@
 
   function loadDemo(){
     const demo = [
-      {id:"demo-life",name:"Life / 生命",rank:"root",children:[
+      {id:"demo-life",name:"Life",rank:"root",children:[
         {id:"demo-bac",name:"Bacteria",rank:"domain"},
         {id:"demo-arc",name:"Archaea",rank:"domain"},
         {id:"demo-euk",name:"Eukaryota",rank:"domain",children:[
@@ -423,46 +641,40 @@
 
   async function loadChildren(n){
     if(n.placeholder) return;
-    if(n.children!==null){n.expanded=!n.expanded; render(); return;}
+    if(n.children!==null){
+      n.expanded=!n.expanded;
+      render();
+      fitTree();
+      return;
+    }
     n.loading=true; render();
     try{
-      const data=await fetchJSON(`${API}${DATASET}/tree/${encodeURIComponent(n.id)}/children?insertPlaceholder=true`);
-      let arr=listFrom(data);
-      // Some API variants return direct array-like object values.
-      if(!arr.length && data && typeof data==="object"){
-        const vals=Object.values(data).filter(v=>v && typeof v==="object" && getId(v));
-        if(vals.length) arr=vals;
-      }
-      n.hiddenCount=Math.max(0,arr.length-MAX_CHILDREN);
-      const visible=arr.slice(0,MAX_CHILDREN);
-      n.children=visible.map(x=>makeNode(x,n));
+      const kids=await ensureChildren(n,MAX_CHILDREN);
       n.expanded=true;
-      setStatus(`${n.name}: 子ノード ${arr.length} 件${n.hiddenCount?`（描画は先頭${MAX_CHILDREN}件。検索で全件へ到達可）`:""}`);
+      setStatus(`${displayName(n)}：子ノード ${kids.length+n.hiddenCount} 件${n.hiddenCount?`（描画は先頭${kids.length}件。検索で全件へ到達可）`:""}`);
     }catch(e){
       console.error(e);
       n.children=[];
       n.expanded=true;
-      setStatus(`${n.name}: 子ノード取得に失敗`);
-    }finally{n.loading=false;render()}
+      setStatus(`${displayName(n)}：子ノード取得に失敗`);
+    }finally{
+      n.loading=false;
+      render();
+      fitTree();
+    }
   }
 
   async function expandDepth(n, depth){
     if(depth<=0 || n.placeholder) return;
-    if(n.children===null){
-      try{
-        const data=await fetchJSON(`${API}${DATASET}/tree/${encodeURIComponent(n.id)}/children?insertPlaceholder=true`);
-        const arr=listFrom(data);
-        n.hiddenCount=Math.max(0,arr.length-MAX_CHILDREN);
-        n.children=arr.slice(0,MAX_CHILDREN).map(x=>makeNode(x,n));
-      }catch(e){n.children=[]}
-    }
-    n.expanded=true;
+    try{
+      await ensureChildren(n,MAX_CHILDREN);
+      n.expanded=true;
+      if(depth>1){
+        for(const c of (n.children||[]).slice(0,24)) await expandDepth(c,depth-1);
+      }
+    }catch(e){ console.warn(e); }
     render();
-    if(depth>1){
-      // avoid API stampede
-      for(const c of (n.children||[]).slice(0,20)) await expandDepth(c,depth-1);
-    }
-    render();
+    fitTree();
   }
 
   function flattenVisible(){
@@ -529,12 +741,13 @@
 
     const name=document.createElementNS("http://www.w3.org/2000/svg","text");
     name.setAttribute("x",12); name.setAttribute("y",18); name.setAttribute("class","nodeText");
-    name.textContent=truncate(n.common?.ja || n.name,28);
+    const shownName=displayName(n);
+    name.textContent=truncate(shownName,28);
     g.appendChild(name);
 
     const sub=document.createElementNS("http://www.w3.org/2000/svg","text");
     sub.setAttribute("x",12); sub.setAttribute("y",35); sub.setAttribute("class","nodeSub");
-    const subtxt=n.common?.ja ? n.name : (n.rank||"unranked");
+    const subtxt=(shownName!==n.name) ? n.name : rankJa(n.rank);
     sub.textContent=truncate(subtxt,31);
     g.appendChild(sub);
 
@@ -615,26 +828,28 @@
         if(Array.isArray(d.info?.[k])) {vern=d.info[k];break}
       }
     }
-    const ja=vern.find(v=>/^(ja|jpn|japanese)$/.test(vernLang(v))) || vern.find(v=>/[ぁ-んァ-ヶ一-龯]/.test(vernName(v)));
+    const ja=vern.find(v=>/^(ja|jpn|japanese)$/.test(vernLang(v))) || vern.find(v=>hasJapanese(vernName(v)));
     const en=vern.find(v=>/^(en|eng|english)$/.test(vernLang(v)));
-    const jaName=ja?vernName(ja):"和名データなし";
+    const sci=getName(info)||n.name;
+    const jaResolved=ja?vernName(ja):manualJa(sci);
+    const jaName=jaResolved || sci;
     const enName=en?vernName(en):"英名データなし";
     const kana=en?toKatakanaEnglish(vernName(en)):"—";
 
-    n.common={ja:ja?vernName(ja):null,en:en?vernName(en):null,kana:en?kana:null};
+    n.common={ja:jaResolved||null,en:en?vernName(en):null,kana:en?kana:null};
     render();
 
     document.getElementById("dJa").textContent=jaName;
     document.getElementById("dKana").textContent=en?`${kana}（カタカナ英名・自動音写）`:"カタカナ英名なし";
     document.getElementById("dEn").textContent=enName;
-    document.getElementById("dSci").textContent=getName(info)||n.name;
+    document.getElementById("dSci").textContent=sci;
 
     const rank=getRank(info)||n.rank||"unranked";
     const st=getStatus(info)||n.status||"";
     const extinct=info.extinct===true;
     document.getElementById("dChips").innerHTML=
-      `<span class="chip rank">${esc(rank)}</span>`+
-      (st?`<span class="chip good">${esc(st)}</span>`:"")+
+      `<span class="chip rank">${esc(rankJa(rank))}</span>`+
+      (st?`<span class="chip good">${esc(statusJa(st))}</span>`:"")+
       (extinct?`<span class="chip warn">絶滅</span>`:"");
 
     const age=AGE[n.name] || AGE[getName(info)];
@@ -644,10 +859,10 @@
 
     const stats=[
       ["Taxon ID",n.id],
-      ["階級",rank],
-      ["状態",st||"—"],
+      ["階級",rankJa(rank)],
+      ["状態",statusJa(st)],
       ["絶滅",extinct?"はい":"いいえ/不明"],
-      ["親",n.parent?n.parent.name:"根"],
+      ["親",n.parent?displayName(n.parent):"根"],
       ["読み込んだ子",(n.children?.length??"未読込")+(n.hiddenCount?` + 非描画${n.hiddenCount}`:"")]
     ];
     document.getElementById("dStats").innerHTML=stats.map(([a,b])=>`<div class="stat"><span class="muted">${esc(a)}</span><span>${esc(b)}</span></div>`).join("");
@@ -689,19 +904,87 @@
     return out.replace(/ンン/g,"ン").replace(/ウウ/g,"ウー");
   }
 
+  function normalizeVernacularHit(v){
+    const id=getId(v);
+    return {
+      ...v,
+      id:id,
+      vernacularName:vernName(v),
+      _fromVernacular:true
+    };
+  }
+
+  function searchScore(x,q){
+    const needle=String(q||"").toLowerCase();
+    const sci=getName(x).toLowerCase();
+    const vn=String(x.vernacularName||x.commonName||japaneseFromUsage(x)||"").toLowerCase();
+    let score=0;
+    if(vn===needle) score+=120;
+    else if(vn.startsWith(needle)) score+=95;
+    else if(vn.includes(needle)) score+=80;
+    if(sci===needle) score+=115;
+    else if(sci.startsWith(needle)) score+=85;
+    else if(sci.includes(needle)) score+=65;
+    if(String(getStatus(x)||"").toLowerCase()==="accepted") score+=12;
+    if(hasJapanese(q) && hasJapanese(vn)) score+=30;
+    return score;
+  }
+
+  async function enrichVernacularHits(rows){
+    const out=[];
+    await mapLimit(rows.slice(0,18),6,async v=>{
+      const id=getId(v);
+      if(!id){ out.push(v); return; }
+      try{
+        const info=await fetchJSON(`${API}${DATASET}/taxon/${encodeURIComponent(id)}`);
+        const t=info?.taxon ?? info ?? {};
+        out.push({...t,...v,id:String(id),scientificName:getName(t)!=="—"?getName(t):(v.scientificName||v.name)});
+      }catch(e){ out.push(v); }
+    });
+    return out;
+  }
+
   async function search(q){
     q=q.trim(); if(!q)return;
-    resultsEl.innerHTML="検索中…";
+    resultsEl.innerHTML="和名・学名・英名を検索中…";
+    setStatus(`「${q}」を検索中…`);
     try{
-      const u1=`${API}${DATASET}/nameusage/search?q=${encodeURIComponent(q)}&limit=20`;
-      const u2=`${API}${DATASET}/nameusage/search?q=${encodeURIComponent(q)}&content=VERNACULAR_NAME&limit=20`;
-      const [a,b]=await Promise.all([fetchJSON(u1).catch(()=>({})),fetchJSON(u2).catch(()=>({}))]);
-      const merged=[...listFrom(a),...listFrom(b)];
+      const enc=encodeURIComponent(q);
+      const uSci=`${API}${DATASET}/nameusage/search?q=${enc}&content=SCIENTIFIC_NAME&type=standard&limit=30`;
+      const uVernUsage=`${API}${DATASET}/nameusage/search?q=${enc}&content=VERNACULAR_NAME&type=standard&limit=30`;
+      const uVern=`${API}${DATASET}/vernacular?q=${enc}&limit=30`;
+
+      const [a,b,c]=await Promise.all([
+        fetchJSON(uSci).catch(()=>({})),
+        fetchJSON(uVernUsage).catch(()=>({})),
+        fetchJSON(uVern).catch(()=>({}))
+      ]);
+
+      let vernRows=listFrom(c).map(normalizeVernacularHit).filter(x=>getId(x)!=null);
+      if(vernRows.length) vernRows=await enrichVernacularHits(vernRows);
+
+      let merged=[...listFrom(a),...listFrom(b),...vernRows];
+
+      // 標準検索でゼロなら学名側だけ fuzzy も試す。
+      if(!merged.length){
+        const f=await fetchJSON(`${API}${DATASET}/nameusage/search?q=${enc}&content=SCIENTIFIC_NAME&type=fuzzy&limit=30`).catch(()=>({}));
+        merged=[...listFrom(f)];
+      }
+
       const uniq=[]; const seen=new Set();
-      for(const x of merged){const id=getId(x);if(id!=null&&!seen.has(String(id))){seen.add(String(id));uniq.push(x)}}
+      for(const x of merged){
+        const id=getId(x);
+        if(id==null) continue;
+        const key=String(id);
+        if(!seen.has(key)){seen.add(key);uniq.push(x)}
+      }
+      uniq.sort((x,y)=>searchScore(y,q)-searchScore(x,q));
       showResults(uniq.slice(0,30),q);
+      setStatus(`「${q}」：${uniq.length} 件の候補${uniq.length>30?"（上位30件を表示）":""}`);
     }catch(e){
-      console.error(e);resultsEl.innerHTML=`<span style="color:#ffadad">検索失敗。ネット接続を確認してください。</span>`;
+      console.error(e);
+      resultsEl.innerHTML=`<span style="color:#ffadad">検索に失敗しました。少し待って再試行してください。</span>`;
+      setStatus("検索APIでエラーが発生しました");
     }
   }
 
@@ -709,9 +992,15 @@
     if(!arr.length){resultsEl.innerHTML=`「${esc(q)}」は見つかりませんでした。`;return}
     resultsEl.innerHTML="";
     for(const x of arr){
+      const sci=getName(x);
+      const jp=japaneseFromUsage(x) || manualJa(sci);
+      const directVern=stripHtml(x.vernacularName||x.commonName||"");
+      const title=jp || directVern || sci;
+      const subtitle=(title!==sci && sci!=="—") ? sci : "";
       const el=document.createElement("div"); el.className="result";
-      el.innerHTML=`<div>${esc(stripHtml(x.vernacularName||x.commonName||""))}</div>
-        <div class="sci">${esc(getName(x))}</div><div class="rank">${esc(getRank(x)||"unranked")} · ${esc(getStatus(x)||"")}</div>`;
+      el.innerHTML=`<div><strong>${esc(title)}</strong></div>
+        ${subtitle?`<div class="sci">${esc(subtitle)}</div>`:""}
+        <div class="rank">${esc(rankJa(getRank(x)))}${getStatus(x)?` · ${esc(statusJa(getStatus(x)))}`:""}</div>`;
       el.addEventListener("click",()=>jumpToSearchResult(x));
       resultsEl.appendChild(el);
     }
@@ -727,6 +1016,8 @@
       if(!path.length){
         // Fallback: show target as temporary root
         const n=makeNode(x);
+        const jpHit=japaneseFromUsage(x);
+        if(jpHit) n.common.ja=jpHit;
         state.roots=[n];render();state.selected=n;await selectNode(n);fitTree();return;
       }
 
@@ -746,7 +1037,7 @@
       const n=chain[chain.length-1];
       state.selected=n;
       render();fitTree();await selectNode(n);
-      setStatus(`検索経路: ${chain.map(c=>c.name).join(" → ")}`);
+      setStatus(`検索経路: ${chain.map(c=>displayName(c)).join(" → ")}`);
     }catch(e){
       console.error(e);
       const n=makeNode(x);state.roots=[n];render();fitTree();await selectNode(n);
