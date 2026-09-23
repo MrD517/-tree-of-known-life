@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#08111f">
+<title>生命系統樹 — Tree of Known Life</title>
+<style>
+  :root{
+    --bg:#07101c; --panel:#0d1928; --panel2:#111f31; --line:#33516f;
+    --text:#edf7ff; --muted:#93a9bd; --accent:#72e0d1; --accent2:#8db6ff;
+    --warn:#ffc66d; --danger:#ff8181; --chip:#15283d; --border:#243d55;
+    --node:#122b3d; --nodeHover:#17384e; --selected:#1e4a55;
+    --shadow:0 12px 34px rgba(0,0,0,.34);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP","Hiragino Sans",Meiryo,sans-serif}
+  body{overflow:hidden}
+  button,input,select{font:inherit}
+  button{color:var(--text);background:var(--chip);border:1px solid var(--border);
+    border-radius:10px;padding:9px 12px;cursor:pointer}
+  button:hover{filter:brightness(1.12)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  a{color:#9ec5ff}
+  #app{height:100%;display:grid;grid-template-columns:330px 1fr 380px;grid-template-rows:auto 1fr;
+    grid-template-areas:"top top top" "left main right"}
+  header{grid-area:top;display:flex;gap:10px;align-items:center;padding:10px 12px;
+    border-bottom:1px solid var(--border);background:rgba(7,16,28,.96);z-index:10}
+  .brand{font-weight:800;white-space:nowrap;letter-spacing:.02em}
+  .brand small{display:block;color:var(--muted);font-size:11px;font-weight:500}
+  .searchWrap{position:relative;flex:1;max-width:720px}
+  #search{width:100%;background:#0b1726;color:var(--text);border:1px solid var(--border);
+    border-radius:12px;padding:11px 42px 11px 13px;outline:none}
+  #search:focus{border-color:#5d9ed0;box-shadow:0 0 0 3px rgba(93,158,208,.13)}
+  #searchBtn{position:absolute;right:4px;top:4px;padding:7px 10px;border:0;background:transparent}
+  .topBtns{display:flex;gap:7px;margin-left:auto}
+  .iconBtn{min-width:42px}
+  #left{grid-area:left;background:var(--panel);border-right:1px solid var(--border);overflow:auto;padding:14px}
+  #main{grid-area:main;position:relative;overflow:hidden;background:
+    radial-gradient(circle at 50% 15%,rgba(44,106,134,.12),transparent 38%),
+    linear-gradient(180deg,#07101c,#07121f)}
+  #right{grid-area:right;background:var(--panel);border-left:1px solid var(--border);overflow:auto;padding:14px}
+  h2,h3{margin:0 0 10px}
+  h3{font-size:14px;color:#d9ecfa}
+  .section{margin-bottom:18px}
+  .muted{color:var(--muted)}
+  .tiny{font-size:11px;line-height:1.45}
+  .small{font-size:13px;line-height:1.55}
+  .chip{display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:999px;background:var(--chip);
+    color:#c9dbea;font-size:11px;border:1px solid var(--border);margin:2px}
+  .chip.good{border-color:#387c72;color:#a7eee2}
+  .chip.warn{border-color:#80652f;color:#ffd995}
+  .chip.rank{color:#bcd2ff}
+  .stat{display:grid;grid-template-columns:1fr auto;gap:7px 12px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+  .stat span:last-child{text-align:right}
+  .notice{padding:10px 11px;background:#111f31;border:1px solid var(--border);border-radius:12px;line-height:1.5}
+  .notice.warn{border-color:#6e5526;background:#201b12}
+  .legendRow{display:flex;align-items:center;gap:8px;margin:7px 0}
+  .legendLine{width:36px;height:0;border-top:2px solid #6b8cac}
+  .legendLine.dashed{border-top-style:dashed}
+  .result{padding:10px;border:1px solid var(--border);border-radius:11px;margin:7px 0;background:#0c1928;cursor:pointer}
+  .result:hover{background:#12243a}
+  .result .sci{font-style:italic;font-size:13px}
+  .result .rank{font-size:11px;color:var(--muted)}
+  #treeSvg{width:100%;height:100%;touch-action:none;user-select:none}
+  #stage{transform-origin:0 0}
+  .link{fill:none;stroke:#426681;stroke-width:1.5;opacity:.88}
+  .link.classification{stroke-dasharray:5 4;opacity:.72}
+  .nodeBox{fill:var(--node);stroke:#31506b;stroke-width:1}
+  .nodeBox:hover{fill:var(--nodeHover)}
+  .nodeBox.selected{fill:var(--selected);stroke:#77d8c8;stroke-width:2}
+  .nodeText{fill:var(--text);font-size:12px;pointer-events:none}
+  .nodeSub{fill:#93abc0;font-size:10px;pointer-events:none}
+  .nodeAge{fill:#ffd28a;font-size:9px;pointer-events:none}
+  .toggleCircle{fill:#15354b;stroke:#5480a0;stroke-width:1}
+  .toggleText{fill:#d9efff;font-size:13px;text-anchor:middle;dominant-baseline:middle;pointer-events:none}
+  .placeholder .nodeBox{stroke-dasharray:4 3}
+  #loading{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:12px 16px;
+    background:rgba(9,20,33,.92);border:1px solid var(--border);border-radius:12px;display:none;z-index:4}
+  #status{position:absolute;left:12px;bottom:12px;padding:7px 10px;background:rgba(8,17,30,.86);
+    border:1px solid var(--border);border-radius:9px;font-size:11px;color:var(--muted);max-width:70%}
+  #miniTools{position:absolute;right:12px;top:12px;display:flex;flex-direction:column;gap:7px;z-index:3}
+  #miniTools button{width:42px;height:42px;padding:0;font-size:18px;background:rgba(14,29,45,.92)}
+  .nameJa{font-size:23px;font-weight:800;line-height:1.3;margin-bottom:3px}
+  .nameKana{font-size:14px;color:#c8eaff;margin-bottom:3px}
+  .nameEn{font-size:13px;color:#a9c0d3;margin-bottom:3px}
+  .nameSci{font-size:14px;font-style:italic;color:#dbe8f2;margin-bottom:12px}
+  .footnotes ol{padding-left:21px}
+  .footnotes li{margin-bottom:8px}
+  .ageCard{padding:11px;border-radius:12px;background:#171b1f;border:1px solid #5f4c27}
+  .ageBig{font-size:20px;font-weight:800;color:#ffd38d}
+  .sourceList a{display:block;margin:7px 0;word-break:break-all;font-size:11px}
+  #mobileDetailsBtn{display:none}
+  #drawerShade{display:none}
+  .kbd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;border:1px solid #42556a;border-radius:5px;padding:1px 5px;font-size:10px}
+  .timeline{position:absolute;left:14px;right:14px;top:10px;height:31px;pointer-events:none;opacity:.48;z-index:1}
+  .timeline .bar{position:absolute;left:0;right:0;top:15px;border-top:1px solid #58738d}
+  .timeline .tick{position:absolute;top:8px;height:14px;border-left:1px solid #58738d}
+  .timeline .label{position:absolute;top:-4px;transform:translateX(-50%);font-size:9px;color:#859db2}
+  .switchLine{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+  select{background:#0d1b2c;color:var(--text);border:1px solid var(--border);padding:8px;border-radius:9px}
+  @media(max-width:1100px){
+    #app{grid-template-columns:285px 1fr;grid-template-areas:"top top" "left main"}
+    #right{display:none}
+    #mobileDetailsBtn{display:inline-flex}
+  }
+  @media(max-width:720px){
+    body{overflow:hidden}
+    #app{grid-template-columns:1fr;grid-template-rows:auto 1fr;grid-template-areas:"top" "main"}
+    header{padding:8px;flex-wrap:wrap}
+    .brand{font-size:14px}
+    .brand small{display:none}
+    .searchWrap{order:3;flex-basis:100%;max-width:none}
+    .topBtns{gap:5px}
+    .topBtns .desktopOnly{display:none}
+    #left{display:none}
+    #main{min-height:0}
+    #status{max-width:calc(100% - 90px);bottom:8px;left:8px}
+    #miniTools{right:8px;top:8px}
+    #miniTools button{width:38px;height:38px}
+    #right.mobileOpen{display:block;position:fixed;z-index:40;left:0;right:0;bottom:0;top:18%;
+      border-left:0;border-top:1px solid var(--border);border-radius:18px 18px 0 0;box-shadow:var(--shadow)}
+    #drawerShade.mobileOpen{display:block;position:fixed;inset:0;background:rgba(0,0,0,.48);z-index:39}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+<header>
+  <div class="brand">生命系統樹 <span class="muted">β</span><small>Tree of Known Life — Catalogue of Life Explorer</small></div>
+  <div class="searchWrap">
+    <input id="search" placeholder="和名・英名・学名で検索　例：シャチ / killer whale / Orcinus orca">
+    <button id="searchBtn" title="検索">⌕</button>
+  </div>
+  <div class="topBtns">
+    <button id="rootBtn" class="desktopOnly">根へ</button>
+    <button id="fitBtn" class="desktopOnly">全体表示</button>
+    <button id="mobileDetailsBtn">詳細</button>
+  </div>
+</header>
+
+<aside id="left">
+  <div class="section">
+    <h3>データ</h3>
+    <div class="notice small">
+      <b>Catalogue of Life XR</b><br>
+      2026-08-26 / ChecklistBank 316165<br>
+      <span class="muted">2,487,367 accepted species</span>
+    </div>
+    <div class="switchLine" style="margin-top:9px">
+      <label class="tiny muted">データセット</label>
+      <select id="datasetSel">
+        <option value="316165">COL26.8 XR（固定・網羅性優先）</option>
+        <option value="3LR">COL 最新リリース</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>表示の読み方</h3>
+    <div class="legendRow tiny"><span class="legendLine"></span> 系統として補足済みの主要枝</div>
+    <div class="legendRow tiny"><span class="legendLine dashed"></span> CoL分類上の親子関係</div>
+    <div class="tiny muted">＋を押すと枝を展開。ノードを押すと名称・年代・出典を表示します。</div>
+  </div>
+
+  <div class="section">
+    <h3>検索結果</h3>
+    <div id="results" class="tiny muted">ここに候補が出ます。</div>
+  </div>
+
+  <div class="section">
+    <h3>表示</h3>
+    <div class="switchLine">
+      <button id="expand2">選択枝を2段展開</button>
+      <button id="collapseBtn">選択枝を畳む</button>
+    </div>
+    <div class="tiny muted" style="margin-top:7px">巨大な科・属では描画数を自動制限します。検索すれば非表示分にも直接飛べます。</div>
+  </div>
+
+  <div class="section footnotes">
+    <h3>重要な脚注</h3>
+    <ol class="tiny muted">
+      <li>この樹は全収録種へ到達できる<strong>分類階層ブラウザ</strong>です。下位の全ノードが分子系統で検証済みとは限りません。</li>
+      <li>細菌・古細菌などでは水平遺伝子移動が多く、進化史は完全な一本の「木」で表せない場合があります。</li>
+      <li>分岐年代は研究で推定値が得られる主要節のみ表示します。未確定の場所へ架空の数字は入れません。</li>
+      <li>和名・英名はデータベースに俗名がある場合のみ表示。カタカナ英名は既存表記が得られない場合、機械音写として明示します。</li>
+      <li>ウイルスは「生物か」の定義が議論されるため、CoLに含まれる分類は表示しますが生命樹上の扱いには注意が必要です。</li>
+    </ol>
+  </div>
+</aside>
+
+<main id="main">
+  <div class="timeline" aria-hidden="true">
+    <div class="bar"></div>
+    <span class="tick" style="left:0%"></span><span class="label" style="left:0%">4.5 Ga</span>
+    <span class="tick" style="left:22%"></span><span class="label" style="left:22%">3.5</span>
+    <span class="tick" style="left:44%"></span><span class="label" style="left:44%">2.5</span>
+    <span class="tick" style="left:66%"></span><span class="label" style="left:66%">1.5</span>
+    <span class="tick" style="left:88%"></span><span class="label" style="left:88%">0.5</span>
+    <span class="tick" style="left:100%"></span><span class="label" style="left:100%">現在</span>
+  </div>
+  <svg id="treeSvg" role="img" aria-label="生命分類樹">
+    <g id="stage"></g>
+  </svg>
+  <div id="miniTools">
+    <button id="zoomIn" title="拡大">＋</button>
+    <button id="zoomOut" title="縮小">−</button>
+    <button id="centerSel" title="選択ノードを中央">◎</button>
+  </div>
+  <div id="loading">読み込み中…</div>
+  <div id="status">接続待ち</div>
+</main>
+
+<div id="drawerShade"></div>
+<aside id="right">
+  <div id="detailEmpty" class="notice small">
+    樹のノードを選ぶと、ここに和名・英名・学名・分類階級・分岐年代・出典が出ます。
+  </div>
+  <div id="detail" style="display:none">
+    <div class="nameJa" id="dJa">—</div>
+    <div class="nameKana" id="dKana">—</div>
+    <div class="nameEn" id="dEn">—</div>
+    <div class="nameSci" id="dSci">—</div>
+    <div id="dChips"></div>
+
+    <div class="section" style="margin-top:16px">
+      <h3>分岐年代</h3>
+      <div id="dAge" class="ageCard small">この節点には年代データを割り当てていません。</div>
+    </div>
+
+    <div class="section">
+      <h3>分類・状態</h3>
+      <div id="dStats" class="small"></div>
+    </div>
+
+    <div class="section">
+      <h3>俗名</h3>
+      <div id="dVern" class="small muted">—</div>
+    </div>
+
+    <div class="section">
+      <h3>このノードについて</h3>
+      <div id="dNote" class="notice tiny"></div>
+    </div>
+
+    <div class="section sourceList">
+      <h3>データ出典</h3>
+      <a href="https://www.catalogueoflife.org/" target="_blank" rel="noopener">[C1] Catalogue of Life — 現行分類・俗名</a>
+      <a href="https://github.com/CatalogueOfLife/backend/blob/master/API.md" target="_blank" rel="noopener">[C2] ChecklistBank API guide — tree browsing / vernacular names</a>
+      <a href="https://doi.org/10.1038/s41559-024-02461-1" target="_blank" rel="noopener">[A1] Moody et al. 2024 — LUCA ≈4.2 Ga (4.09–4.33 Ga)</a>
+      <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC11559618/" target="_blank" rel="noopener">[A2] Ediacaran origin and diversification of Metazoa — 動物・左右相称動物の年代不確実性</a>
+      <a href="https://doi.org/10.1038/s41586-024-07324-0" target="_blank" rel="noopener">[A3] Zuntini et al. 2024 — 被子植物の大規模系統・年代解析</a>
+      <a href="https://academic.oup.com/mbe/article/39/8/msac174/6657692" target="_blank" rel="noopener">[R1] TimeTree 5 — 分岐年代研究を探すための参考DB（本ファイルへデータ再配布はしていません）</a>
+      <a href="https://tree.opentreeoflife.org/" target="_blank" rel="noopener">[R2] Open Tree of Life — 合成系統樹の参考</a>
+    </div>
+  </div>
+</aside>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const API = "https://api.checklistbank.org/dataset/";
+  let DATASET = "316165";
+  const MAX_CHILDREN = 220;
+  const NODE_W = 205, NODE_H = 49, DX = 265, DY = 66;
+
+  // Major divergence nodes only. Values are broad literature-scale guides, not fabricated per taxon.
+  // min/max = million years ago. "label" is intentionally a range when literature varies.
+  const AGE = {
+    "LUCA": {min:4090,max:4330,label:"約40.9–43.3億年前", note:"Moody et al. (2024) はLUCAを約42億年前（4.09–4.33 Ga）と推定。これは一研究の推定で、絶対年代が確定したという意味ではありません。", src:"[A1] Moody et al. 2024"},
+    "Eukaryota": {min:1600,max:2100,label:"約16–21億年前", note:"真核生物の起源・LECAの年代は化石・分子時計で幅があります。", src:"TimeTree / eukaryote literature"},
+    "Opisthokonta": {min:900,max:1300,label:"約9–13億年前", note:"動物・菌類を含む後方鞭毛生物の深い分岐。推定幅が大きい節です。", src:"複数の分子時計研究に幅あり（R1等で要個別照合）"},
+    "Metazoa": {min:580,max:635,label:"主にエディアカラ紀初期〜中期", note:"2024年の化石再較正を組み込んだ解析では、Metazoaの起源を初期エディアカラ紀に置きます。一方、より古い分子時計推定もあり、議論が続いています。", src:"[A2] 2024 Metazoa divergence study"},
+    "Animalia": {min:580,max:635,label:"主にエディアカラ紀初期〜中期", note:"ここではMetazoaと同義的に扱う場合の目安。研究によって冠群定義と年代が異なります。", src:"[A2] 2024 Metazoa divergence study"},
+    "Bilateria": {min:539,max:580,label:"主に後期エディアカラ紀", note:"同解析ではBilateriaを後期エディアカラ紀に置きます。節点定義・化石較正・時計モデルで年代は動きます。", src:"[A2] 2024 Metazoa divergence study"},
+    "Chordata": {min:530,max:600,label:"約5.3–6.0億年前", note:"脊索動物の深い分岐。", src:"概略文献レンジ（R1等で要個別照合）"},
+    "Vertebrata": {min:500,max:550,label:"約5.0–5.5億年前", note:"脊椎動物の冠群付近。", src:"概略文献レンジ（R1等で要個別照合）"},
+    "Tetrapoda": {min:360,max:395,label:"約3.6–3.95億年前", note:"四肢動物の起源付近。化石上の最初期記録と冠群分岐は同義ではありません。", src:"脊椎動物化石記録に基づく概略"},
+    "Amniota": {min:310,max:330,label:"約3.1–3.3億年前", note:"羊膜類（哺乳類系統と爬虫類・鳥類系統）の分岐付近。", src:"概略文献レンジ（R1等で要個別照合）"},
+    "Mammalia": {min:160,max:225,label:"約1.6–2.25億年前", note:"哺乳類冠群の定義と分子時計により幅があります。", src:"哺乳類分子時計研究に幅あり（R1等で要個別照合）"},
+    "Aves": {min:70,max:110,label:"約0.7–1.1億年前", note:"現生鳥類の冠群年代。主要放散はK-Pg境界前後に集中したという研究があります。", src:"鳥類分子時計研究に幅あり（R1等で要個別照合）"},
+    "Fungi": {min:900,max:1500,label:"約9–15億年前", note:"菌類の起源は深く、分子時計推定の幅が特に大きい領域です。", src:"菌類分子時計研究に幅あり（R1等で要個別照合）"},
+    "Viridiplantae": {min:900,max:1200,label:"約9–12億年前", note:"緑色植物系統の深い分岐。", src:"植物分子時計研究に幅あり（R1等で要個別照合）"},
+    "Embryophyta": {min:460,max:520,label:"約4.6–5.2億年前", note:"陸上植物の起源。胞子化石と分子時計で推定幅があります。", src:"植物化石・分子時計研究に幅あり"},
+    "Tracheophyta": {min:420,max:450,label:"約4.2–4.5億年前", note:"維管束植物の初期分岐。", src:"植物化石記録に基づく概略"},
+    "Spermatophyta": {min:320,max:370,label:"約3.2–3.7億年前", note:"種子植物の起源付近。", src:"種子植物年代研究に幅あり"},
+    "Magnoliophyta": {min:150,max:240,label:"約1.5–2.4億年前級（強い不確実性）", note:"Zuntini et al. (2024) は被子植物根の最大制約として154 Maと247 Maの二つを用い、年代不確実性を明示しました。ここは単一の確定値にしません。", src:"[A3] Zuntini et al. 2024"},
+    "Angiospermae": {min:150,max:240,label:"約1.5–2.4億年前級（強い不確実性）", note:"被子植物冠群の年代は化石記録と分子時計の間で長く議論されています。", src:"[A3] Zuntini et al. 2024"}
+  };
+
+  const PHYLO_NAMES = new Set(Object.keys(AGE));
+
+  const commonKatakana = {
+    "killer":"キラー","whale":"ホエール","blue":"ブルー","great":"グレート","white":"ホワイト",
+    "shark":"シャーク","human":"ヒューマン","house":"ハウス","mouse":"マウス","cat":"キャット","dog":"ドッグ",
+    "brown":"ブラウン","bear":"ベア","polar":"ポーラー","red":"レッド","fox":"フォックス","giant":"ジャイアント",
+    "panda":"パンダ","common":"コモン","bottlenose":"ボトルノーズ","dolphin":"ドルフィン","orca":"オルカ",
+    "green":"グリーン","sea":"シー","lion":"ライオン","tiger":"タイガー","wolf":"ウルフ","eagle":"イーグル",
+    "golden":"ゴールデン","black":"ブラック","spotted":"スポッテッド","fin":"フィン","humpback":"ハンプバック",
+    "sperm":"スパーム","right":"ライト","minke":"ミンク","japanese":"ジャパニーズ","asian":"エイジアン",
+    "african":"アフリカン","european":"ヨーロピアン","american":"アメリカン","northern":"ノーザン",
+    "southern":"サザン","western":"ウェスタン","eastern":"イースタン"
+  };
+
+  const state = {
+    roots:[],
+    selected:null,
+    transform:{x:60,y:70,k:1},
+    dragging:false,
+    dragStart:null,
+    cache:new Map(),
+    details:new Map()
+  };
+
+  const svg = document.getElementById("treeSvg");
+  const stage = document.getElementById("stage");
+  const loading = document.getElementById("loading");
+  const status = document.getElementById("status");
+  const resultsEl = document.getElementById("results");
+
+  function setStatus(msg){ status.textContent = msg; }
+  function showLoading(v, msg="読み込み中…"){ loading.style.display=v?"block":"none"; loading.textContent=msg; }
+
+  async function fetchJSON(url){
+    const c = new AbortController();
+    const t = setTimeout(()=>c.abort(), 18000);
+    try{
+      const r = await fetch(url,{headers:{"Accept":"application/json"},signal:c.signal});
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      return await r.json();
+    } finally { clearTimeout(t); }
+  }
+
+  function listFrom(data){
+    if(Array.isArray(data)) return data;
+    if(!data || typeof data!=="object") return [];
+    for(const k of ["result","results","items","children","taxa","usages","data"]){
+      if(Array.isArray(data[k])) return data[k];
+    }
+    return [];
+  }
+
+  function getId(o){
+    if(!o) return null;
+    return o.id ?? o.ID ?? o.taxonID ?? o.taxonId ?? o.key ?? o.usageKey ?? o.nameUsageId ?? null;
+  }
+  function getName(o){
+    if(!o) return "—";
+    return stripHtml(o.name ?? o.scientificName ?? o.label ?? o.labelHtml ?? o.canonicalName ?? o.uninomial ?? "—");
+  }
+  function getRank(o){ return String(o.rank ?? o.taxonRank ?? "").toLowerCase(); }
+  function getStatus(o){ return o.status ?? o.taxonomicStatus ?? ""; }
+  function hasChildrenHint(o){
+    return !!(o.hasChildren ?? o.children ?? o.childCount ?? o.numChildren ?? o.count);
+  }
+  function stripHtml(s){
+    const d=document.createElement("div"); d.innerHTML=String(s??""); return d.textContent||d.innerText||"";
+  }
+  function esc(s){
+    return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));
+  }
+
+  function makeNode(raw, parent=null){
+    const id = getId(raw) || ("virtual-"+crypto.randomUUID());
+    const name = getName(raw);
+    return {
+      id:String(id), raw, parent, name,
+      rank:getRank(raw), status:getStatus(raw),
+      children:null, expanded:false, loading:false,
+      placeholder:!!(raw.placeholder || raw.virtual || raw.isPlaceholder),
+      hiddenCount:0, common:null
+    };
+  }
+
+  async function loadRoots(){
+    showLoading(true,"生命の根元を取得中…");
+    setStatus("Catalogue of Life に接続中…");
+    try{
+      const data=await fetchJSON(`${API}${DATASET}/tree`);
+      const arr=listFrom(data);
+      if(!arr.length) throw new Error("root response empty");
+      state.roots=arr.map(x=>makeNode(x));
+      state.selected=null;
+      render();
+      fitTree();
+      setStatus(`根ノード ${state.roots.length} 件。＋で枝を展開`);
+    }catch(e){
+      console.error(e);
+      setStatus("APIへ接続できません。ネット接続/CORSを確認してください。デモ樹を表示します。");
+      loadDemo();
+    }finally{showLoading(false)}
+  }
+
+  function loadDemo(){
+    const demo = [
+      {id:"demo-life",name:"Life / 生命",rank:"root",children:[
+        {id:"demo-bac",name:"Bacteria",rank:"domain"},
+        {id:"demo-arc",name:"Archaea",rank:"domain"},
+        {id:"demo-euk",name:"Eukaryota",rank:"domain",children:[
+          {id:"demo-opi",name:"Opisthokonta",rank:"clade",children:[
+            {id:"demo-fun",name:"Fungi",rank:"kingdom"},
+            {id:"demo-ani",name:"Animalia",rank:"kingdom",children:[
+              {id:"demo-cho",name:"Chordata",rank:"phylum"},
+            ]}
+          ]},
+          {id:"demo-pla",name:"Viridiplantae",rank:"clade",children:[
+            {id:"demo-emb",name:"Embryophyta",rank:"clade"}
+          ]}
+        ]}
+      ]}
+    ];
+    function cv(r,p=null){
+      const n=makeNode(r,p);
+      if(r.children){n.children=r.children.map(c=>cv(c,n));n.expanded=true}
+      return n;
+    }
+    state.roots=demo.map(x=>cv(x));
+    render(); fitTree();
+  }
+
+  async function loadChildren(n){
+    if(n.placeholder) return;
+    if(n.children!==null){n.expanded=!n.expanded; render(); return;}
+    n.loading=true; render();
+    try{
+      const data=await fetchJSON(`${API}${DATASET}/tree/${encodeURIComponent(n.id)}/children?insertPlaceholder=true`);
+      let arr=listFrom(data);
+      // Some API variants return direct array-like object values.
+      if(!arr.length && data && typeof data==="object"){
+        const vals=Object.values(data).filter(v=>v && typeof v==="object" && getId(v));
+        if(vals.length) arr=vals;
+      }
+      n.hiddenCount=Math.max(0,arr.length-MAX_CHILDREN);
+      const visible=arr.slice(0,MAX_CHILDREN);
+      n.children=visible.map(x=>makeNode(x,n));
+      n.expanded=true;
+      setStatus(`${n.name}: 子ノード ${arr.length} 件${n.hiddenCount?`（描画は先頭${MAX_CHILDREN}件。検索で全件へ到達可）`:""}`);
+    }catch(e){
+      console.error(e);
+      n.children=[];
+      n.expanded=true;
+      setStatus(`${n.name}: 子ノード取得に失敗`);
+    }finally{n.loading=false;render()}
+  }
+
+  async function expandDepth(n, depth){
+    if(depth<=0 || n.placeholder) return;
+    if(n.children===null){
+      try{
+        const data=await fetchJSON(`${API}${DATASET}/tree/${encodeURIComponent(n.id)}/children?insertPlaceholder=true`);
+        const arr=listFrom(data);
+        n.hiddenCount=Math.max(0,arr.length-MAX_CHILDREN);
+        n.children=arr.slice(0,MAX_CHILDREN).map(x=>makeNode(x,n));
+      }catch(e){n.children=[]}
+    }
+    n.expanded=true;
+    render();
+    if(depth>1){
+      // avoid API stampede
+      for(const c of (n.children||[]).slice(0,20)) await expandDepth(c,depth-1);
+    }
+    render();
+  }
+
+  function flattenVisible(){
+    const out=[];
+    function walk(n,depth){
+      out.push({n,depth});
+      if(n.expanded && n.children){
+        for(const c of n.children) walk(c,depth+1);
+      }
+    }
+    for(const r of state.roots) walk(r,0);
+    return out;
+  }
+
+  function computeLayout(){
+    let leaf=0;
+    function rec(n,depth){
+      const kids=(n.expanded && n.children && n.children.length)?n.children:null;
+      let y;
+      if(kids){
+        const ys=kids.map(c=>rec(c,depth+1).y);
+        y=(ys[0]+ys[ys.length-1])/2;
+      }else{
+        y=leaf*DY; leaf++;
+      }
+      n._x=depth*DX; n._y=y;
+      return {x:n._x,y:n._y};
+    }
+    for(const r of state.roots){rec(r,0); leaf+=0.35}
+    return {width:Math.max(700,...flattenVisible().map(x=>x.n._x+NODE_W+100)),height:Math.max(450,leaf*DY+120)};
+  }
+
+  function render(){
+    const size=computeLayout();
+    stage.innerHTML="";
+    // links first
+    for(const {n} of flattenVisible()){
+      if(n.parent && n.parent.expanded){
+        const p=n.parent;
+        const x1=p._x+NODE_W, y1=p._y+NODE_H/2;
+        const x2=n._x, y2=n._y+NODE_H/2;
+        const path=document.createElementNS("http://www.w3.org/2000/svg","path");
+        const mx=(x1+x2)/2;
+        path.setAttribute("d",`M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`);
+        path.setAttribute("class","link "+(PHYLO_NAMES.has(n.name)||PHYLO_NAMES.has(p.name)?"":"classification"));
+        stage.appendChild(path);
+      }
+    }
+    for(const {n} of flattenVisible()) drawNode(n);
+    applyTransform();
+  }
+
+  function drawNode(n){
+    const g=document.createElementNS("http://www.w3.org/2000/svg","g");
+    g.setAttribute("transform",`translate(${n._x},${n._y})`);
+    g.setAttribute("class","node "+(n.placeholder?"placeholder":""));
+    g.style.cursor="pointer";
+
+    const rect=document.createElementNS("http://www.w3.org/2000/svg","rect");
+    rect.setAttribute("width",NODE_W); rect.setAttribute("height",NODE_H); rect.setAttribute("rx",11);
+    rect.setAttribute("class","nodeBox"+(state.selected===n?" selected":""));
+    rect.addEventListener("click",ev=>{ev.stopPropagation(); selectNode(n);});
+    g.appendChild(rect);
+
+    const name=document.createElementNS("http://www.w3.org/2000/svg","text");
+    name.setAttribute("x",12); name.setAttribute("y",18); name.setAttribute("class","nodeText");
+    name.textContent=truncate(n.common?.ja || n.name,28);
+    g.appendChild(name);
+
+    const sub=document.createElementNS("http://www.w3.org/2000/svg","text");
+    sub.setAttribute("x",12); sub.setAttribute("y",35); sub.setAttribute("class","nodeSub");
+    const subtxt=n.common?.ja ? n.name : (n.rank||"unranked");
+    sub.textContent=truncate(subtxt,31);
+    g.appendChild(sub);
+
+    const a=AGE[n.name];
+    if(a){
+      const age=document.createElementNS("http://www.w3.org/2000/svg","text");
+      age.setAttribute("x",NODE_W-8); age.setAttribute("y",11); age.setAttribute("text-anchor","end"); age.setAttribute("class","nodeAge");
+      age.textContent=a.label;
+      g.appendChild(age);
+    }
+
+    if(!n.placeholder){
+      const tg=document.createElementNS("http://www.w3.org/2000/svg","g");
+      tg.setAttribute("transform",`translate(${NODE_W+15},${NODE_H/2})`);
+      tg.style.cursor="pointer";
+      const c=document.createElementNS("http://www.w3.org/2000/svg","circle");
+      c.setAttribute("r",11); c.setAttribute("class","toggleCircle");
+      const t=document.createElementNS("http://www.w3.org/2000/svg","text");
+      t.setAttribute("class","toggleText"); t.textContent=n.loading?"…":(n.expanded?"−":"+");
+      tg.appendChild(c); tg.appendChild(t);
+      tg.addEventListener("click",ev=>{ev.stopPropagation();loadChildren(n)});
+      g.appendChild(tg);
+    }
+
+    if(n.hiddenCount){
+      const h=document.createElementNS("http://www.w3.org/2000/svg","text");
+      h.setAttribute("x",NODE_W-8); h.setAttribute("y",NODE_H-5); h.setAttribute("text-anchor","end"); h.setAttribute("class","nodeAge");
+      h.textContent=`+${n.hiddenCount} 非描画`;
+      g.appendChild(h);
+    }
+
+    stage.appendChild(g);
+  }
+
+  function truncate(s,n){s=String(s||"");return s.length>n?s.slice(0,n-1)+"…":s}
+
+  async function selectNode(n){
+    state.selected=n; render();
+    centerNode(n,false);
+    document.getElementById("detailEmpty").style.display="none";
+    document.getElementById("detail").style.display="block";
+    document.getElementById("dJa").textContent=n.common?.ja||"名称取得中…";
+    document.getElementById("dSci").textContent=n.name;
+    document.getElementById("dKana").textContent="";
+    document.getElementById("dEn").textContent="";
+    document.getElementById("dStats").innerHTML="";
+    await loadDetails(n);
+    if(innerWidth<=720) openDetails();
+  }
+
+  async function loadDetails(n){
+    if(state.details.has(n.id)){applyDetails(n,state.details.get(n.id));return}
+    if(n.id.startsWith("demo-")){
+      const d={info:n.raw,vern:[]};state.details.set(n.id,d);applyDetails(n,d);return;
+    }
+    try{
+      const [info,vern] = await Promise.all([
+        fetchJSON(`${API}${DATASET}/taxon/${encodeURIComponent(n.id)}/info`).catch(()=>({})),
+        fetchJSON(`${API}${DATASET}/taxon/${encodeURIComponent(n.id)}/vernacular`).catch(()=>[])
+      ]);
+      const d={info,vern:listFrom(vern).length?listFrom(vern):(Array.isArray(vern)?vern:[])};
+      state.details.set(n.id,d);
+      applyDetails(n,d);
+    }catch(e){
+      console.error(e);
+      applyDetails(n,{info:n.raw,vern:[]});
+    }
+  }
+
+  function vernName(v){return stripHtml(v.name ?? v.vernacularName ?? v.label ?? v.value ?? "")}
+  function vernLang(v){return String(v.language ?? v.lang ?? v.languageCode ?? v.isoLanguage ?? "").toLowerCase()}
+  function applyDetails(n,d){
+    const info=d.info?.taxon ?? d.info ?? n.raw;
+    let vern=d.vern||[];
+    // info endpoint may embed vernacular names
+    if(!vern.length){
+      for(const k of ["vernacularNames","vernacular","commonNames"]){
+        if(Array.isArray(d.info?.[k])) {vern=d.info[k];break}
+      }
+    }
+    const ja=vern.find(v=>/^(ja|jpn|japanese)$/.test(vernLang(v))) || vern.find(v=>/[ぁ-んァ-ヶ一-龯]/.test(vernName(v)));
+    const en=vern.find(v=>/^(en|eng|english)$/.test(vernLang(v)));
+    const jaName=ja?vernName(ja):"和名データなし";
+    const enName=en?vernName(en):"英名データなし";
+    const kana=en?toKatakanaEnglish(vernName(en)):"—";
+
+    n.common={ja:ja?vernName(ja):null,en:en?vernName(en):null,kana:en?kana:null};
+    render();
+
+    document.getElementById("dJa").textContent=jaName;
+    document.getElementById("dKana").textContent=en?`${kana}（カタカナ英名・自動音写）`:"カタカナ英名なし";
+    document.getElementById("dEn").textContent=enName;
+    document.getElementById("dSci").textContent=getName(info)||n.name;
+
+    const rank=getRank(info)||n.rank||"unranked";
+    const st=getStatus(info)||n.status||"";
+    const extinct=info.extinct===true;
+    document.getElementById("dChips").innerHTML=
+      `<span class="chip rank">${esc(rank)}</span>`+
+      (st?`<span class="chip good">${esc(st)}</span>`:"")+
+      (extinct?`<span class="chip warn">絶滅</span>`:"");
+
+    const age=AGE[n.name] || AGE[getName(info)];
+    document.getElementById("dAge").innerHTML = age
+      ? `<div class="ageBig">${esc(age.label)}</div><div>${esc(age.note)}</div><div class="tiny muted" style="margin-top:5px">※ ${esc(age.src)}。節点定義・解析法で値は変動します。</div>`
+      : `<div class="muted">この節点には信頼できる分岐年代を自動割当していません。</div><div class="tiny" style="margin-top:5px">「不明」を数字で埋めるより、ここは空白の方が科学的にマシです。</div>`;
+
+    const stats=[
+      ["Taxon ID",n.id],
+      ["階級",rank],
+      ["状態",st||"—"],
+      ["絶滅",extinct?"はい":"いいえ/不明"],
+      ["親",n.parent?n.parent.name:"根"],
+      ["読み込んだ子",(n.children?.length??"未読込")+(n.hiddenCount?` + 非描画${n.hiddenCount}`:"")]
+    ];
+    document.getElementById("dStats").innerHTML=stats.map(([a,b])=>`<div class="stat"><span class="muted">${esc(a)}</span><span>${esc(b)}</span></div>`).join("");
+
+    document.getElementById("dVern").innerHTML=vern.length
+      ? vern.slice(0,40).map(v=>`<div>${esc(vernName(v))} <span class="muted tiny">${esc(vernLang(v)||"lang ?")}</span></div>`).join("")
+      : "俗名データなし";
+
+    const isPhy=PHYLO_NAMES.has(n.name);
+    document.getElementById("dNote").innerHTML =
+      isPhy
+      ? `この主要節は年代注釈を持つ補助ノードです。ただし表示線の長さ自体は年代比例ではありません。`
+      : `この枝線はCatalogue of Lifeの分類上の親子関係を可視化しています。<strong>必ずしもこの節点が分子系統学的な分岐点そのものとは限りません。</strong>`;
+  }
+
+  function toKatakanaEnglish(s){
+    // Deliberately labelled machine transliteration. Common words are mapped;
+    // unknown words receive a coarse pronounceable approximation.
+    return s.split(/([\s\-–—]+)/).map(part=>{
+      if(/^[\s\-–—]+$/.test(part)) return part;
+      const w=part.toLowerCase().replace(/[^a-z']/g,"");
+      if(!w) return part;
+      if(commonKatakana[w]) return commonKatakana[w];
+      return roughKana(w);
+    }).join("");
+  }
+
+  function roughKana(w){
+    const rules=[
+      [/tion/g,"ション"],[/sion/g,"ジョン"],[/ture/g,"チャー"],[/ph/g,"フ"],[/sh/g,"シュ"],[/ch/g,"チ"],
+      [/th/g,"ス"],[/wh/g,"ホ"],[/qu/g,"ク"],[/ck/g,"ック"],[/ng/g,"ング"],[/oo/g,"ウー"],[/ee/g,"イー"],
+      [/ai/g,"アイ"],[/ay/g,"エイ"],[/ow/g,"オウ"],[/ou/g,"アウ"],[/er$/g,"アー"],[/ar/g,"アー"],[/or/g,"オー"]
+    ];
+    for(const [r,k] of rules) w=w.replace(r,k);
+    const m={a:"ア",b:"ブ",c:"ク",d:"ド",e:"エ",f:"フ",g:"グ",h:"ハ",i:"イ",j:"ジ",k:"ク",l:"ル",m:"ム",
+      n:"ン",o:"オ",p:"プ",q:"ク",r:"ル",s:"ス",t:"ト",u:"ウ",v:"ヴ",w:"ウ",x:"クス",y:"イ",z:"ズ","'":""};
+    let out="";
+    for(const ch of w) out += /[\u30A0-\u30FF]/.test(ch)?ch:(m[ch]||ch);
+    return out.replace(/ンン/g,"ン").replace(/ウウ/g,"ウー");
+  }
+
+  async function search(q){
+    q=q.trim(); if(!q)return;
+    resultsEl.innerHTML="検索中…";
+    try{
+      const u1=`${API}${DATASET}/nameusage/search?q=${encodeURIComponent(q)}&limit=20`;
+      const u2=`${API}${DATASET}/nameusage/search?q=${encodeURIComponent(q)}&content=VERNACULAR_NAME&limit=20`;
+      const [a,b]=await Promise.all([fetchJSON(u1).catch(()=>({})),fetchJSON(u2).catch(()=>({}))]);
+      const merged=[...listFrom(a),...listFrom(b)];
+      const uniq=[]; const seen=new Set();
+      for(const x of merged){const id=getId(x);if(id!=null&&!seen.has(String(id))){seen.add(String(id));uniq.push(x)}}
+      showResults(uniq.slice(0,30),q);
+    }catch(e){
+      console.error(e);resultsEl.innerHTML=`<span style="color:#ffadad">検索失敗。ネット接続を確認してください。</span>`;
+    }
+  }
+
+  function showResults(arr,q){
+    if(!arr.length){resultsEl.innerHTML=`「${esc(q)}」は見つかりませんでした。`;return}
+    resultsEl.innerHTML="";
+    for(const x of arr){
+      const el=document.createElement("div"); el.className="result";
+      el.innerHTML=`<div>${esc(stripHtml(x.vernacularName||x.commonName||""))}</div>
+        <div class="sci">${esc(getName(x))}</div><div class="rank">${esc(getRank(x)||"unranked")} · ${esc(getStatus(x)||"")}</div>`;
+      el.addEventListener("click",()=>jumpToSearchResult(x));
+      resultsEl.appendChild(el);
+    }
+  }
+
+  async function jumpToSearchResult(x){
+    const id=String(getId(x));
+    showLoading(true,"根からの経路を組み立て中…");
+    try{
+      const data=await fetchJSON(`${API}${DATASET}/tree/${encodeURIComponent(id)}`);
+      let path=listFrom(data);
+      if(!path.length && Array.isArray(data)) path=data;
+      if(!path.length){
+        // Fallback: show target as temporary root
+        const n=makeNode(x);
+        state.roots=[n];render();state.selected=n;await selectNode(n);fitTree();return;
+      }
+
+      // path may be root→target or target→root. Normalize using target id.
+      const ids=path.map(getId).map(String);
+      if(ids[0]===id && ids[ids.length-1]!==id) path.reverse();
+      if(String(getId(path[path.length-1]))!==id){
+        const target=x; path.push(target);
+      }
+      const chain=path.map(p=>makeNode(p));
+      for(let i=0;i<chain.length-1;i++){
+        chain[i].children=[chain[i+1]];
+        chain[i].expanded=true;
+        chain[i+1].parent=chain[i];
+      }
+      state.roots=[chain[0]];
+      const n=chain[chain.length-1];
+      state.selected=n;
+      render();fitTree();await selectNode(n);
+      setStatus(`検索経路: ${chain.map(c=>c.name).join(" → ")}`);
+    }catch(e){
+      console.error(e);
+      const n=makeNode(x);state.roots=[n];render();fitTree();await selectNode(n);
+    }finally{showLoading(false)}
+  }
+
+  function applyTransform(){
+    stage.setAttribute("transform",`translate(${state.transform.x},${state.transform.y}) scale(${state.transform.k})`);
+  }
+  function zoom(factor,cx=svg.clientWidth/2,cy=svg.clientHeight/2){
+    const old=state.transform.k;
+    const nk=Math.min(2.8,Math.max(.18,old*factor));
+    const wx=(cx-state.transform.x)/old, wy=(cy-state.transform.y)/old;
+    state.transform.x=cx-wx*nk; state.transform.y=cy-wy*nk; state.transform.k=nk; applyTransform();
+  }
+  function fitTree(){
+    const nodes=flattenVisible().map(x=>x.n); if(!nodes.length)return;
+    const minX=Math.min(...nodes.map(n=>n._x)), maxX=Math.max(...nodes.map(n=>n._x+NODE_W+30));
+    const minY=Math.min(...nodes.map(n=>n._y)), maxY=Math.max(...nodes.map(n=>n._y+NODE_H));
+    const w=maxX-minX, h=maxY-minY;
+    const pad=55, aw=svg.clientWidth-pad*2, ah=svg.clientHeight-pad*2;
+    const k=Math.min(1.1,Math.max(.18,Math.min(aw/w,ah/h)));
+    state.transform.k=k;
+    state.transform.x=pad-minX*k;
+    state.transform.y=pad-minY*k+25;
+    applyTransform();
+  }
+  function centerNode(n,animate=true){
+    if(!n)return;
+    state.transform.x=svg.clientWidth/2-(n._x+NODE_W/2)*state.transform.k;
+    state.transform.y=svg.clientHeight/2-(n._y+NODE_H/2)*state.transform.k;
+    applyTransform();
+  }
+
+  svg.addEventListener("wheel",e=>{e.preventDefault();zoom(e.deltaY<0?1.12:.89,e.offsetX,e.offsetY)},{passive:false});
+  svg.addEventListener("pointerdown",e=>{
+    if(e.target.closest && e.target.closest(".node"))return;
+    state.dragging=true; state.dragStart={x:e.clientX,y:e.clientY,tx:state.transform.x,ty:state.transform.y}; svg.setPointerCapture(e.pointerId);
+  });
+  svg.addEventListener("pointermove",e=>{
+    if(!state.dragging)return;
+    state.transform.x=state.dragStart.tx+(e.clientX-state.dragStart.x);
+    state.transform.y=state.dragStart.ty+(e.clientY-state.dragStart.y);
+    applyTransform();
+  });
+  svg.addEventListener("pointerup",()=>state.dragging=false);
+  svg.addEventListener("pointercancel",()=>state.dragging=false);
+
+  function openDetails(){
+    document.getElementById("right").classList.add("mobileOpen");
+    document.getElementById("drawerShade").classList.add("mobileOpen");
+  }
+  function closeDetails(){
+    document.getElementById("right").classList.remove("mobileOpen");
+    document.getElementById("drawerShade").classList.remove("mobileOpen");
+  }
+
+  document.getElementById("searchBtn").onclick=()=>search(document.getElementById("search").value);
+  document.getElementById("search").addEventListener("keydown",e=>{if(e.key==="Enter")search(e.currentTarget.value)});
+  document.getElementById("zoomIn").onclick=()=>zoom(1.25);
+  document.getElementById("zoomOut").onclick=()=>zoom(.8);
+  document.getElementById("fitBtn").onclick=fitTree;
+  document.getElementById("centerSel").onclick=()=>state.selected?centerNode(state.selected):fitTree();
+  document.getElementById("rootBtn").onclick=loadRoots;
+  document.getElementById("expand2").onclick=()=>state.selected&&expandDepth(state.selected,2);
+  document.getElementById("collapseBtn").onclick=()=>{if(state.selected){state.selected.expanded=false;render();fitTree()}};
+  document.getElementById("mobileDetailsBtn").onclick=openDetails;
+  document.getElementById("drawerShade").onclick=closeDetails;
+  document.getElementById("datasetSel").onchange=e=>{DATASET=e.target.value;state.cache.clear();state.details.clear();loadRoots()};
+  window.addEventListener("resize",()=>{render();});
+
+  loadRoots();
+})();
+</script>
+</body>
+</html>
