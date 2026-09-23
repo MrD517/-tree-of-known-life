@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#08111f">
-<title>生命系統樹 β8 — Tree of Known Life</title>
+<title>生命系統樹 β9 — Tree of Known Life</title>
 <style>
   :root{
     --bg:#07101c; --panel:#0d1928; --panel2:#111f31; --line:#33516f;
@@ -127,7 +127,7 @@
     background:rgba(9,20,33,.92);border:1px solid var(--border);border-radius:12px;display:none;z-index:4}
   #status{position:absolute;left:12px;bottom:12px;padding:7px 10px;background:rgba(8,17,30,.86);
     border:1px solid var(--border);border-radius:9px;font-size:11px;color:var(--muted);max-width:70%}
-  #miniTools{position:absolute;right:12px;top:12px;display:flex;flex-direction:column;gap:7px;z-index:3}
+  #miniTools{position:absolute;right:12px;top:98px;display:flex;flex-direction:column;gap:7px;z-index:3}
   #miniTools button{width:42px;height:42px;padding:0;font-size:18px;background:rgba(14,29,45,.92)}
   .nameJa{font-size:23px;font-weight:800;line-height:1.3;margin-bottom:3px}
   .nameKana{font-size:14px;color:#c8eaff;margin-bottom:3px}
@@ -141,10 +141,55 @@
   #mobileDetailsBtn{display:none}
   #drawerShade{display:none}
   .kbd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;border:1px solid #42556a;border-radius:5px;padding:1px 5px;font-size:10px}
-  .timeline{position:absolute;left:14px;right:14px;top:10px;height:31px;pointer-events:none;opacity:.48;z-index:1}
-  .timeline .bar{position:absolute;left:0;right:0;top:15px;border-top:1px solid #58738d}
-  .timeline .tick{position:absolute;top:8px;height:14px;border-left:1px solid #58738d}
-  .timeline .label{position:absolute;top:-4px;transform:translateX(-50%);font-size:9px;color:#859db2}
+  .geoTimeline{
+    position:absolute;left:0;right:0;top:0;height:88px;z-index:2;
+    background:linear-gradient(180deg,rgba(7,16,28,.97),rgba(7,16,28,.88));
+    border-bottom:1px solid rgba(78,111,139,.34);
+    pointer-events:none;overflow:hidden;
+  }
+  .geoTop{
+    position:absolute;left:12px;right:12px;top:5px;height:16px;
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
+    font-size:9px;color:#8299ad;white-space:nowrap;
+  }
+  .geoTop strong{font-size:10px;color:#b9ccdc;font-weight:650}
+  .geoScale{position:absolute;left:12px;right:12px;top:25px;height:57px}
+  .geoBand{
+    position:absolute;overflow:hidden;border-left:1px solid rgba(159,190,214,.20);
+    border-right:1px solid rgba(10,20,32,.35);
+    color:#9bb0c0;text-align:center;white-space:nowrap;
+  }
+  .geoBand.major{
+    top:0;height:24px;line-height:24px;font-size:9px;
+    background:rgba(83,128,159,.09)
+  }
+  .geoBand.minor{
+    top:25px;height:20px;line-height:20px;font-size:8px;
+    background:rgba(112,144,166,.045);color:#718b9e
+  }
+  .geoBand:nth-child(even){background:rgba(121,158,181,.075)}
+  .geoTick{
+    position:absolute;top:46px;height:8px;border-left:1px solid rgba(118,151,176,.38)
+  }
+  .geoTickLabel{
+    position:absolute;top:51px;transform:translateX(-50%);
+    font-size:7px;color:#60798e;white-space:nowrap
+  }
+  .geoSelectionRange{
+    position:absolute;top:0;height:45px;min-width:2px;
+    background:rgba(255,198,109,.10);
+    border-left:1px solid rgba(255,198,109,.72);
+    border-right:1px solid rgba(255,198,109,.72);
+  }
+  .geoSelectionPoint{
+    position:absolute;top:-1px;height:47px;border-left:2px solid rgba(255,198,109,.82)
+  }
+  .geoSelectionLabel{
+    position:absolute;top:-2px;transform:translate(-50%,-100%);
+    padding:2px 5px;border-radius:6px;background:rgba(41,35,24,.94);
+    border:1px solid rgba(255,198,109,.42);font-size:8px;color:#ffd797;
+    max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
   .switchLine{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
   select{background:#0d1b2c;color:var(--text);border:1px solid var(--border);padding:8px;border-radius:9px}
   @media(max-width:1100px){
@@ -167,7 +212,7 @@
     #left{display:none}
     #main{min-height:0}
     #status{max-width:calc(100% - 90px);bottom:8px;left:8px}
-    #miniTools{right:8px;top:8px}
+    #miniTools{right:8px;top:96px}
     #miniTools button{width:38px;height:38px}
     #right.mobileOpen{display:block;position:fixed;z-index:40;left:0;right:0;bottom:0;top:18%;
       border-left:0;border-top:1px solid var(--border);border-radius:18px 18px 0 0;box-shadow:var(--shadow)}
@@ -178,7 +223,7 @@
 <body>
 <div id="app">
 <header>
-  <div class="brand">生命系統樹 <span class="muted">β8</span><small>Tree of Known Life — Catalogue of Life Explorer</small></div>
+  <div class="brand">生命系統樹 <span class="muted">β9</span><small>Tree of Known Life — Catalogue of Life Explorer</small></div>
   <div class="searchWrap">
     <input id="search" autocomplete="off" placeholder="和名・学名・英名で検索　例：シャチ / Orcinus orca / killer whale">
     <button id="searchBtn" title="検索">⌕</button>
@@ -239,22 +284,25 @@
       <li><strong>分類樹</strong>はCatalogue of Lifeの分類階層、<strong>系統樹</strong>はOpen Tree of Lifeの合成系統樹を表示します。同じ生物でも枝分かれは一致しない場合があります。</li>
       <li>系統樹の無名内部ノードは「A系統・B系統の分岐点」のような説明名を自動生成します。正式な学名ではありません。</li>
       <li>細菌・古細菌などでは水平遺伝子移動が多く、進化史は完全な一本の「木」で表せない場合があります。</li>
-      <li>分岐年代は研究で推定値が得られる主要節のみ表示します。未確定の場所へ架空の数字は入れません。</li>
+      <li>上部の地質年代タイムラインはICS 2026/06準拠です。選択ノードの年代に応じて「地球史 → 顕生代 → 新生代 → 第四紀」と自動的に拡大します。枝の横幅そのものは年代比例ではありません。</li>
       <li>表示名は日本語優先です。内蔵辞書 → Catalogue of Life → Wikidata → 日本語Wikipediaの順に日本語名を探し、それでも見つからない場合だけ学名を表示します。Wikidata/Wikipediaは表示名補完用で、分類そのものの根拠には使いません。</li>
+      <li>Catalogue of Lifeが絶滅フラグを持つ分類群は「†」と「絶滅」を表示します。化石年代の収録には差があるため、絶滅年代が不明な場合は不明のままです。</li>
       <li>ウイルスは「生物か」の定義が議論されるため、CoLに含まれる分類は表示しますが生命樹上の扱いには注意が必要です。</li>
     </ol>
   </div>
 </aside>
 
 <main id="main">
-  <div class="timeline" aria-hidden="true">
-    <div class="bar"></div>
-    <span class="tick" style="left:0%"></span><span class="label" style="left:0%">4.5 Ga</span>
-    <span class="tick" style="left:22%"></span><span class="label" style="left:22%">3.5</span>
-    <span class="tick" style="left:44%"></span><span class="label" style="left:44%">2.5</span>
-    <span class="tick" style="left:66%"></span><span class="label" style="left:66%">1.5</span>
-    <span class="tick" style="left:88%"></span><span class="label" style="left:88%">0.5</span>
-    <span class="tick" style="left:100%"></span><span class="label" style="left:100%">現在</span>
+  <div class="geoTimeline" id="geoTimeline" aria-label="地質年代タイムライン">
+    <div class="geoTop">
+      <strong id="geoTitle">地球史</strong>
+      <span id="geoReadout">約46億年前 → 現在</span>
+    </div>
+    <div class="geoScale" id="geoScale">
+      <div id="geoBands"></div>
+      <div id="geoTicks"></div>
+      <div id="geoSelection"></div>
+    </div>
   </div>
   <svg id="treeSvg" role="img" aria-label="生命分類樹">
     <g id="stage"></g>
@@ -302,7 +350,8 @@
 
     <div class="section sourceList">
       <h3>データ出典</h3>
-      <a href="https://www.catalogueoflife.org/" target="_blank" rel="noopener">[C1] Catalogue of Life — 現行分類・俗名</a>
+      <a href="https://stratigraphy.org/chart" target="_blank" rel="noopener">[G1] International Commission on Stratigraphy — International Chronostratigraphic Chart 2026/06</a>
+      <a href="https://www.catalogueoflife.org/" target="_blank" rel="noopener">[C1] Catalogue of Life — 現行分類・俗名・絶滅情報</a>
       <a href="https://github.com/CatalogueOfLife/backend/blob/master/API.md" target="_blank" rel="noopener">[C2] ChecklistBank API guide — tree browsing / vernacular names</a>
       <a href="https://doi.org/10.1038/s41559-024-02461-1" target="_blank" rel="noopener">[A1] Moody et al. 2024 — LUCA ≈4.2 Ga (4.09–4.33 Ga)</a>
       <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC11559618/" target="_blank" rel="noopener">[A2] Ediacaran origin and diversification of Metazoa — 動物・左右相称動物の年代不確実性</a>
@@ -346,6 +395,125 @@
     "Spermatophyta": {min:320,max:370,label:"約3.2–3.7億年前", note:"種子植物の起源付近。", src:"種子植物年代研究に幅あり"},
     "Magnoliophyta": {min:150,max:240,label:"約1.5–2.4億年前級（強い不確実性）", note:"Zuntini et al. (2024) は被子植物根の最大制約として154 Maと247 Maの二つを用い、年代不確実性を明示しました。ここは単一の確定値にしません。", src:"[A3] Zuntini et al. 2024"},
     "Angiospermae": {min:150,max:240,label:"約1.5–2.4億年前級（強い不確実性）", note:"被子植物冠群の年代は化石記録と分子時計の間で長く議論されています。", src:"[A3] Zuntini et al. 2024"}
+  };
+
+
+  // International Chronostratigraphic Chart (ICS), current 2026/06 framework.
+  // This is a display scale; branch horizontal length is NOT claimed to be time-proportional.
+  const GEO_WINDOWS = {
+    earth:{
+      title:"地球史",
+      older:4600, younger:0,
+      readout:"約46億年前 → 現在",
+      major:[
+        ["冥王代",4600,4000],
+        ["太古代",4000,2500],
+        ["原生代",2500,538.8],
+        ["顕生代",538.8,0]
+      ],
+      minor:[
+        ["古原生代",2500,1600],
+        ["中原生代",1600,1000],
+        ["新原生代",1000,538.8],
+        ["古生代",538.8,251.902],
+        ["中生代",251.902,66],
+        ["新生代",66,0]
+      ],
+      ticks:[4600,4000,3000,2500,2000,1500,1000,538.8,0]
+    },
+    phanerozoic:{
+      title:"顕生代",
+      older:538.8, younger:0,
+      readout:"5億3880万年前 → 現在",
+      major:[
+        ["古生代",538.8,251.902],
+        ["中生代",251.902,66],
+        ["新生代",66,0]
+      ],
+      minor:[
+        ["カンブリア紀",538.8,486.85],
+        ["オルドビス紀",486.85,443.1],
+        ["シルル紀",443.1,419.62],
+        ["デボン紀",419.62,358.86],
+        ["石炭紀",358.86,298.9],
+        ["ペルム紀",298.9,251.902],
+        ["三畳紀",251.902,201.4],
+        ["ジュラ紀",201.4,143.1],
+        ["白亜紀",143.1,66],
+        ["古第三紀",66,23.04],
+        ["新第三紀",23.04,2.58],
+        ["第四紀",2.58,0]
+      ],
+      ticks:[538.8,450,400,350,300,251.902,200,150,100,66,23.04,2.58,0]
+    },
+    cenozoic:{
+      title:"新生代",
+      older:66, younger:0,
+      readout:"6600万年前 → 現在",
+      major:[
+        ["古第三紀",66,23.04],
+        ["新第三紀",23.04,2.58],
+        ["第四紀",2.58,0]
+      ],
+      minor:[
+        ["暁新世",66,56],
+        ["始新世",56,33.9],
+        ["漸新世",33.9,23.04],
+        ["中新世",23.04,5.333],
+        ["鮮新世",5.333,2.58],
+        ["更新世",2.58,0.0117],
+        ["完新世",0.0117,0]
+      ],
+      ticks:[66,56,40,33.9,23.04,10,5.333,2.58,0]
+    },
+    quaternary:{
+      title:"第四紀",
+      older:2.58, younger:0,
+      readout:"258万年前 → 現在",
+      major:[
+        ["更新世",2.58,0.0117],
+        ["完新世",0.0117,0]
+      ],
+      minor:[
+        ["ジェラシアン期",2.58,1.80],
+        ["カラブリアン期",1.80,0.774],
+        ["チバニアン期",0.774,0.129],
+        ["後期更新世",0.129,0.0117],
+        ["グリーンランディアン期",0.0117,0.0082],
+        ["ノースグリッピアン期",0.0082,0.0042],
+        ["メーガーラヤン期",0.0042,0]
+      ],
+      ticks:[2.58,2,1.5,1,0.5,0.129,0.0117,0]
+    }
+  };
+
+  const GEO_NAME_RANGE = {
+    "hadean":[4600,4000], "冥王代":[4600,4000],
+    "archean":[4000,2500], "太古代":[4000,2500],
+    "proterozoic":[2500,538.8], "原生代":[2500,538.8],
+    "phanerozoic":[538.8,0], "顕生代":[538.8,0],
+    "paleozoic":[538.8,251.902], "古生代":[538.8,251.902],
+    "mesozoic":[251.902,66], "中生代":[251.902,66],
+    "cenozoic":[66,0], "新生代":[66,0],
+    "cambrian":[538.8,486.85], "カンブリア紀":[538.8,486.85],
+    "ordovician":[486.85,443.1], "オルドビス紀":[486.85,443.1],
+    "silurian":[443.1,419.62], "シルル紀":[443.1,419.62],
+    "devonian":[419.62,358.86], "デボン紀":[419.62,358.86],
+    "carboniferous":[358.86,298.9], "石炭紀":[358.86,298.9],
+    "permian":[298.9,251.902], "ペルム紀":[298.9,251.902],
+    "triassic":[251.902,201.4], "三畳紀":[251.902,201.4],
+    "jurassic":[201.4,143.1], "ジュラ紀":[201.4,143.1],
+    "cretaceous":[143.1,66], "白亜紀":[143.1,66],
+    "paleogene":[66,23.04], "古第三紀":[66,23.04],
+    "neogene":[23.04,2.58], "新第三紀":[23.04,2.58],
+    "quaternary":[2.58,0], "第四紀":[2.58,0],
+    "paleocene":[66,56], "暁新世":[66,56],
+    "eocene":[56,33.9], "始新世":[56,33.9],
+    "oligocene":[33.9,23.04], "漸新世":[33.9,23.04],
+    "miocene":[23.04,5.333], "中新世":[23.04,5.333],
+    "pliocene":[5.333,2.58], "鮮新世":[5.333,2.58],
+    "pleistocene":[2.58,0.0117], "更新世":[2.58,0.0117],
+    "holocene":[0.0117,0], "完新世":[0.0117,0]
   };
 
   const PHYLO_NAMES = new Set(Object.keys(AGE));
@@ -833,7 +1001,8 @@
     selected:null,
     mode:"taxonomy",
     taxonomySaved:null,
-    transform:{x:60,y:70,k:1},
+    geoWindow:"earth",
+    transform:{x:60,y:115,k:1},
     dragging:false,
     dragStart:null,
     cache:new Map(),
@@ -849,6 +1018,271 @@
 
   function setStatus(msg){ status.textContent = msg; }
   function showLoading(v, msg="読み込み中…"){ loading.style.display=v?"block":"none"; loading.textContent=msg; }
+
+
+  function formatMa(ma){
+    if(ma===0) return "現在";
+    if(ma>=1000) return `${Number((ma/1000).toFixed(2))} Ga`;
+    if(ma>=10) return `${Number(ma.toFixed(1))} Ma`;
+    if(ma>=1) return `${Number(ma.toFixed(2))} Ma`;
+    if(ma>=0.001) return `${Number((ma*1000).toFixed(1))} ka`;
+    return `${Math.round(ma*1e6)} 年`;
+  }
+
+  function geoPos(age,w){
+    const span=w.older-w.younger;
+    return Math.max(0,Math.min(100,((w.older-age)/span)*100));
+  }
+
+  function normalizeGeoName(v){
+    return String(v||"")
+      .replace(/^(early|middle|late|lower|upper)\s+/i,"")
+      .replace(/\s+(early|middle|late)$/i,"")
+      .trim().toLowerCase();
+  }
+
+  function rangeFromGeoName(v){
+    if(!v) return null;
+    const raw=String(v).trim();
+    if(GEO_NAME_RANGE[raw]) return GEO_NAME_RANGE[raw];
+    const key=normalizeGeoName(raw);
+    if(GEO_NAME_RANGE[key]) return GEO_NAME_RANGE[key];
+    for(const [name,range] of Object.entries(GEO_NAME_RANGE)){
+      if(/^[a-z]/i.test(name) && key.includes(name.toLowerCase())) return range;
+    }
+    return null;
+  }
+
+  function nodeTimeRange(n){
+    if(!n) return null;
+
+    const a=AGE[n.name];
+    if(a) return {older:a.max,younger:a.min,source:"分岐年代推定"};
+
+    const rStart=rangeFromGeoName(n.temporalRangeStart);
+    const rEnd=rangeFromGeoName(n.temporalRangeEnd);
+    if(rStart && rEnd){
+      return {
+        older:Math.max(rStart[0],rStart[1],rEnd[0],rEnd[1]),
+        younger:Math.min(rStart[0],rStart[1],rEnd[0],rEnd[1]),
+        source:"Catalogue of Life 時代範囲"
+      };
+    }
+    if(rStart) return {older:rStart[0],younger:rStart[1],source:"Catalogue of Life 時代範囲"};
+    if(rEnd) return {older:rEnd[0],younger:rEnd[1],source:"Catalogue of Life 時代範囲"};
+
+    if(n.extinct===false) return {older:0,younger:0,source:"現生"};
+    return null;
+  }
+
+  function chooseGeoWindow(range){
+    if(!range) return "earth";
+    const older=Math.max(range.older||0,range.younger||0);
+    if(older<=2.58) return "quaternary";
+    if(older<=66) return "cenozoic";
+    if(older<=538.8) return "phanerozoic";
+    return "earth";
+  }
+
+  function renderGeoTimeline(n=null){
+    const range=nodeTimeRange(n);
+    const key=chooseGeoWindow(range);
+    state.geoWindow=key;
+    const w=GEO_WINDOWS[key];
+
+    const bands=document.getElementById("geoBands");
+    const ticks=document.getElementById("geoTicks");
+    const sel=document.getElementById("geoSelection");
+    const title=document.getElementById("geoTitle");
+    const readoutEl=document.getElementById("geoReadout");
+    if(!bands || !ticks || !sel || !title || !readoutEl) return;
+
+    title.textContent=w.title;
+
+    let readout=w.readout;
+    if(n){
+      if(n.extinct===true){
+        readout=`${displayName(n)}：絶滅`;
+        if(range && (range.older!==0 || range.younger!==0)){
+          readout+=`・${formatMa(range.older)}〜${formatMa(range.younger)}`;
+        }
+      }else if(range && (range.older!==0 || range.younger!==0)){
+        readout=`${displayName(n)}：${formatMa(range.older)}〜${formatMa(range.younger)}`;
+      }else if(n.extinct===false){
+        readout=`${displayName(n)}：現生`;
+      }else{
+        readout=`${displayName(n)}：年代情報なし`;
+      }
+    }
+    readoutEl.textContent=readout;
+
+    bands.innerHTML="";
+    for(const [label,older,younger] of w.major){
+      const el=document.createElement("div");
+      el.className="geoBand major";
+      const l=geoPos(older,w), r=geoPos(younger,w);
+      el.style.left=`${l}%`;
+      el.style.width=`${Math.max(.15,r-l)}%`;
+      if((r-l)>2.2) el.textContent=label;
+      bands.appendChild(el);
+    }
+    for(const [label,older,younger] of w.minor){
+      const el=document.createElement("div");
+      el.className="geoBand minor";
+      const l=geoPos(older,w), r=geoPos(younger,w);
+      el.style.left=`${l}%`;
+      el.style.width=`${Math.max(.15,r-l)}%`;
+      if((r-l)>3.1) el.textContent=label;
+      bands.appendChild(el);
+    }
+
+    ticks.innerHTML="";
+    for(const age of w.ticks){
+      const pos=geoPos(age,w);
+      const tick=document.createElement("div");
+      tick.className="geoTick";
+      tick.style.left=`${pos}%`;
+      ticks.appendChild(tick);
+
+      const lab=document.createElement("div");
+      lab.className="geoTickLabel";
+      lab.style.left=`${pos}%`;
+      lab.textContent=formatMa(age);
+      ticks.appendChild(lab);
+    }
+
+    sel.innerHTML="";
+    if(range){
+      const older=Math.min(w.older,Math.max(w.younger,range.older));
+      const younger=Math.min(w.older,Math.max(w.younger,range.younger));
+      const p1=geoPos(Math.max(older,younger),w);
+      const p2=geoPos(Math.min(older,younger),w);
+
+      if(Math.abs(p2-p1)<0.55){
+        const point=document.createElement("div");
+        point.className="geoSelectionPoint";
+        point.style.left=`${p1}%`;
+        sel.appendChild(point);
+      }else{
+        const rr=document.createElement("div");
+        rr.className="geoSelectionRange";
+        rr.style.left=`${Math.min(p1,p2)}%`;
+        rr.style.width=`${Math.max(.25,Math.abs(p2-p1))}%`;
+        sel.appendChild(rr);
+      }
+
+      const lab=document.createElement("div");
+      lab.className="geoSelectionLabel";
+      lab.style.left=`${(p1+p2)/2}%`;
+      lab.textContent=n?.extinct===true ? "絶滅群" : (range.source||"年代");
+      sel.appendChild(lab);
+    }
+  }
+
+  function extractTaxonMeta(data){
+    const candidates=[
+      data?.taxon,
+      data?.usage,
+      data?.nameUsage,
+      data?.result?.taxon,
+      data?.result,
+      data
+    ].filter(x=>x && typeof x==="object");
+
+    for(const x of candidates){
+      if(
+        Object.prototype.hasOwnProperty.call(x,"extinct") ||
+        Object.prototype.hasOwnProperty.call(x,"temporalRangeStart") ||
+        Object.prototype.hasOwnProperty.call(x,"temporalRangeEnd")
+      ) return x;
+    }
+    return candidates[0] || {};
+  }
+
+  function applyMetaToNode(n,data){
+    if(!n) return;
+    const info=extractTaxonMeta(data);
+    if(info.extinct===true) n.extinct=true;
+    else if(info.extinct===false) n.extinct=false;
+    n.temporalRangeStart=info.temporalRangeStart ?? n.temporalRangeStart ?? null;
+    n.temporalRangeEnd=info.temporalRangeEnd ?? n.temporalRangeEnd ?? null;
+  }
+
+  function findJapaneseInInfo(data){
+    const holders=[
+      data,
+      data?.taxon,
+      data?.usage,
+      data?.result,
+      data?.result?.taxon
+    ].filter(Boolean);
+    for(const h of holders){
+      for(const k of ["vernacularNames","vernacular","commonNames"]){
+        if(Array.isArray(h?.[k])){
+          const jp=findJapaneseVernacular(h[k]);
+          if(jp) return jp;
+        }
+      }
+    }
+    return null;
+  }
+
+  async function hydrateTaxonomyNode(n){
+    if(!n || n.placeholder || n.raw?.phylo) return;
+    const sci=n.name || getName(n.raw);
+    const id=getId(n.raw) || n.id;
+    const usableId=(!id || String(id).startsWith("virtual-")) ? null : id;
+
+    if(!usableId){
+      if(!n.common?.ja){
+        const r=await resolveJapaneseName(sci,null);
+        if(r?.name){n.common.ja=r.name;n.common.jaSource=r.source;}
+      }
+      return;
+    }
+
+    const cacheKey=jpCacheKey("fullmeta",usableId);
+    let cached=null;
+    try{
+      const raw=localStorage.getItem(cacheKey);
+      if(raw) cached=JSON.parse(raw);
+    }catch(_){}
+
+    if(cached){
+      applyMetaToNode(n,cached);
+      if(!n.common?.ja && cached.ja){
+        n.common.ja=cached.ja;
+        n.common.jaSource=cached.jaSource||"Catalogue of Life";
+      }
+    }else{
+      try{
+        const info=await fetchJSON(`${API}${DATASET}/taxon/${encodeURIComponent(usableId)}/info`);
+        applyMetaToNode(n,info);
+        const jp=findJapaneseInInfo(info);
+        if(!n.common?.ja && jp){
+          n.common.ja=jp;
+          n.common.jaSource="Catalogue of Life";
+        }
+        const meta=extractTaxonMeta(info);
+        try{
+          localStorage.setItem(cacheKey,JSON.stringify({
+            extinct:meta.extinct,
+            temporalRangeStart:meta.temporalRangeStart ?? null,
+            temporalRangeEnd:meta.temporalRangeEnd ?? null,
+            ja:jp||null,
+            jaSource:jp?"Catalogue of Life":null
+          }));
+        }catch(_){}
+      }catch(e){
+        console.warn("taxon info lookup failed",usableId,e);
+      }
+    }
+
+    if(!n.common?.ja){
+      const r=await resolveJapaneseName(sci,null);
+      if(r?.name){n.common.ja=r.name;n.common.jaSource=r.source;}
+    }
+  }
 
   async function fetchJSON(url){
     const c = new AbortController();
@@ -1172,7 +1606,7 @@
 
     await mapLimit(arr,concurrency,async n=>{
       if(n.raw?.phylo) await hydratePhyloJapanese(n);
-      else await hydrateTaxonomyJapanese(n);
+      else await hydrateTaxonomyNode(n);
     });
   }
 
@@ -1204,6 +1638,9 @@
       children:null, expanded:false, loading:false,
       placeholder:!!(raw.placeholder || raw.virtual || raw.isPlaceholder),
       hiddenCount:0,
+      extinct:(raw?.extinct===true?true:(raw?.extinct===false?false:undefined)),
+      temporalRangeStart:raw?.temporalRangeStart ?? null,
+      temporalRangeEnd:raw?.temporalRangeEnd ?? null,
       common:{ja:manualJa(name),en:null,kana:null}
     };
   }
@@ -1272,6 +1709,7 @@
 
       state.roots=arr.map(x=>makeNode(x));
       state.selected=null;
+      renderGeoTimeline(null);
 
       await hydrateJapaneseNodes(state.roots,6);
 
@@ -1452,12 +1890,12 @@
     const name=document.createElementNS("http://www.w3.org/2000/svg","text");
     name.setAttribute("x",12); name.setAttribute("y",18); name.setAttribute("class","nodeText");
     const shownName=displayName(n);
-    name.textContent=truncate(shownName,28);
+    name.textContent=truncate((n.extinct===true?"† ":"")+shownName,28);
     g.appendChild(name);
 
     const sub=document.createElementNS("http://www.w3.org/2000/svg","text");
     sub.setAttribute("x",12); sub.setAttribute("y",35); sub.setAttribute("class","nodeSub");
-    const subtxt=rankJa(n.rank);
+    const subtxt=rankJa(n.rank)+(n.extinct===true?"・絶滅":"");
     sub.textContent=truncate(subtxt,31);
     g.appendChild(sub);
 
@@ -1495,8 +1933,45 @@
 
   function truncate(s,n){s=String(s||"");return s.length>n?s.slice(0,n-1)+"…":s}
 
+  async function hydrateSelectedPhyloMeta(n){
+    if(!n?.raw?.phylo) return;
+    const sci=n.raw?.taxon?.name;
+    if(!sci) return;
+
+    // OpenTree flags already tell us this sometimes; CoL can add extinct/time-range metadata.
+    try{
+      const usage=await exactColUsageForScientificName(sci);
+      const id=getId(usage);
+      if(!id) return;
+
+      const key=jpCacheKey("phylo-meta",id);
+      let data=null;
+      try{
+        const cached=localStorage.getItem(key);
+        if(cached) data=JSON.parse(cached);
+      }catch(_){}
+
+      if(!data){
+        const info=await fetchJSON(`${API}${DATASET}/taxon/${encodeURIComponent(id)}/info`);
+        const meta=extractTaxonMeta(info);
+        data={
+          extinct:meta.extinct,
+          temporalRangeStart:meta.temporalRangeStart ?? null,
+          temporalRangeEnd:meta.temporalRangeEnd ?? null
+        };
+        try{localStorage.setItem(key,JSON.stringify(data));}catch(_){}
+      }
+      applyMetaToNode(n,data);
+      render();
+      renderGeoTimeline(n);
+    }catch(e){
+      console.warn("selected phylogeny metadata lookup failed",sci,e);
+    }
+  }
+
   async function selectNode(n){
     state.selected=n; render();
+    renderGeoTimeline(n);
     centerNode(n,false);
     document.getElementById("detailEmpty").style.display="none";
     document.getElementById("detail").style.display="block";
@@ -1511,6 +1986,7 @@
 
   async function loadDetails(n){
     if(n.raw?.phylo){
+      await hydrateSelectedPhyloMeta(n);
       applyPhyloDetails(n);
       return;
     }
@@ -1556,7 +2032,10 @@
     const en=vern.find(v=>/^(en|eng|english)$/.test(vernLang(v)));
     const sci=getName(info) || getName(n.raw) || n.name || "名称不明";
     const jaResolved=ja?vernName(ja):manualJa(sci);
-    const jaName=jaResolved || manualJa(sci) || sci || "名称不明";
+    const jaName=n.common?.ja || jaResolved || manualJa(sci) || sci || "名称不明";
+
+    applyMetaToNode(n,d.info);
+    renderGeoTimeline(n);
     const enName=en?vernName(en):"英名データなし";
     const kana=en?toKatakanaEnglish(vernName(en)):"—";
 
@@ -1569,7 +2048,7 @@
 
     const rank=getRank(info)||n.rank||"unranked";
     const st=getStatus(info)||n.status||"";
-    const extinct=info.extinct===true;
+    const extinct=n.extinct===true || info.extinct===true;
     document.getElementById("dChips").innerHTML=
       `<span class="chip rank">${esc(rankJa(rank))}</span>`+
       (st?`<span class="chip good">${esc(statusJa(st))}</span>`:"")+
@@ -1578,14 +2057,19 @@
     const age=AGE[n.name] || AGE[getName(info)];
     document.getElementById("dAge").innerHTML = age
       ? `<div class="ageBig">${esc(age.label)}</div><div>${esc(age.note)}</div><div class="tiny muted" style="margin-top:5px">※ ${esc(age.src)}。節点定義・解析法で値は変動します。</div>`
-      : `<div class="muted">この節点には信頼できる分岐年代を自動割当していません。</div><div class="tiny" style="margin-top:5px">「不明」を数字で埋めるより、ここは空白の方が科学的にマシです。</div>`;
+      : (n.temporalRangeStart || n.temporalRangeEnd)
+        ? `<div class="ageBig">${esc([n.temporalRangeStart,n.temporalRangeEnd].filter(Boolean).join(" ～ "))}</div><div class="tiny muted" style="margin-top:5px">Catalogue of Lifeに登録された時間範囲。数値境界へ変換できる地質年代は上のタイムラインにも表示します。</div>`
+        : `<div class="muted">この節点には信頼できる年代データを割り当てていません。</div><div class="tiny" style="margin-top:5px">分からない年代を捏造はしません。</div>`;
 
     const stats=[
       ["Taxon ID",n.id],
       ["階級",rankJa(rank)],
       ["状態",statusJa(st)],
       ["日本語表示",n.common?.jaSource||"内蔵/CoL"],
-      ["絶滅",extinct?"はい":"いいえ/不明"],
+      ["絶滅",extinct?"はい":(n.extinct===false?"いいえ":"不明")],
+      ["生存時代",(n.temporalRangeStart || n.temporalRangeEnd)
+        ? [n.temporalRangeStart,n.temporalRangeEnd].filter(Boolean).join(" ～ ")
+        : "データなし"],
       ["親",n.parent?displayName(n.parent):"根"],
       ["読み込んだ子",(n.children?.length??"未読込")+(n.hiddenCount?` + 非描画${n.hiddenCount}`:"")]
     ];
@@ -1935,6 +2419,12 @@
       loading:false,
       placeholder:false,
       hiddenCount:0,
+      extinct:(
+        tax?.extinct===true ||
+        (Array.isArray(tax?.flags) && tax.flags.some(f=>String(f).toLowerCase().includes("extinct")))
+      ) ? true : undefined,
+      temporalRangeStart:null,
+      temporalRangeEnd:null,
       common:{ja:isInternal?"系統分岐点":manualJa(taxName),en:null,kana:null}
     };
 
@@ -2062,6 +2552,7 @@
       phyRoot.expanded=false;
       state.roots=[phyRoot];
       state.selected=null;
+      renderGeoTimeline(null);
       render();
       fitTree();
       setStatus("系統樹モード：Open Tree of Life 合成系統樹（浅い階層を表示）");
@@ -2124,14 +2615,19 @@
     document.getElementById("dEn").textContent="";
     document.getElementById("dSci").textContent=(sci && ja!==sci)?sci:"";
 
+    renderGeoTimeline(n);
+
     document.getElementById("dChips").innerHTML=
       `<span class="chip rank">${esc(rankJa(n.rank))}</span>`+
-      `<span class="chip good">系統樹</span>`;
+      `<span class="chip good">系統樹</span>`+
+      (n.extinct===true?`<span class="chip warn">絶滅</span>`:"");
 
     const age=AGE[sci];
     document.getElementById("dAge").innerHTML = age
       ? `<div class="ageBig">${esc(age.label)}</div><div>${esc(age.note)}</div><div class="tiny muted" style="margin-top:5px">※ ${esc(age.src)}</div>`
-      : `<div class="muted">この系統ノードには分岐年代を割り当てていません。</div>`;
+      : (n.temporalRangeStart || n.temporalRangeEnd)
+        ? `<div class="ageBig">${esc([n.temporalRangeStart,n.temporalRangeEnd].filter(Boolean).join(" ～ "))}</div><div class="tiny muted" style="margin-top:5px">Catalogue of Lifeに登録された化石・生存時代。</div>`
+        : `<div class="muted">この系統ノードには分岐年代を割り当てていません。</div>`;
 
     const supportCount=Object.keys(n.raw?.supported_by||{}).length;
     const conflictCount=Object.keys(n.raw?.conflicts_with||{}).length;
@@ -2140,6 +2636,10 @@
       ["OTT ID",n.raw?.ott_id??"—"],
       ["階級",rankJa(n.rank)],
       ["日本語表示",n.common?.jaSource||"内蔵/外部補完"],
+      ["絶滅",n.extinct===true?"はい":(n.extinct===false?"いいえ":"不明")],
+      ["生存時代",(n.temporalRangeStart || n.temporalRangeEnd)
+        ? [n.temporalRangeStart,n.temporalRangeEnd].filter(Boolean).join(" ～ ")
+        : "データなし"],
       ["子孫先端数",n.raw?.num_tips??"—"],
       ["支持ソース",supportCount],
       ["競合ソース",conflictCount],
@@ -2183,6 +2683,7 @@
         state.transform={...state.taxonomySaved.transform};
         render();
         applyTransform();
+        renderGeoTimeline(state.selected);
         setStatus("分類樹モード：Catalogue of Life");
       }else{
         await loadRoots();
@@ -2209,17 +2710,20 @@
     const minX=Math.min(...nodes.map(n=>n._x)), maxX=Math.max(...nodes.map(n=>n._x+NODE_W+30));
     const minY=Math.min(...nodes.map(n=>n._y)), maxY=Math.max(...nodes.map(n=>n._y+NODE_H));
     const w=maxX-minX, h=maxY-minY;
-    const pad=55, aw=svg.clientWidth-pad*2, ah=svg.clientHeight-pad*2;
+    const sidePad=45, topPad=112, bottomPad=45;
+    const aw=Math.max(100,svg.clientWidth-sidePad*2);
+    const ah=Math.max(100,svg.clientHeight-topPad-bottomPad);
     const k=Math.min(1.1,Math.max(.18,Math.min(aw/w,ah/h)));
     state.transform.k=k;
-    state.transform.x=pad-minX*k;
-    state.transform.y=pad-minY*k+25;
+    state.transform.x=sidePad-minX*k;
+    state.transform.y=topPad-minY*k;
     applyTransform();
   }
   function centerNode(n,animate=true){
     if(!n)return;
     state.transform.x=svg.clientWidth/2-(n._x+NODE_W/2)*state.transform.k;
-    state.transform.y=svg.clientHeight/2-(n._y+NODE_H/2)*state.transform.k;
+    const usableCenter=88+(svg.clientHeight-88)/2;
+    state.transform.y=usableCenter-(n._y+NODE_H/2)*state.transform.k;
     applyTransform();
   }
 
@@ -2400,6 +2904,7 @@
   window.addEventListener("resize",()=>{render();});
 
   updateModeButtons();
+  renderGeoTimeline(null);
   loadRoots();
 })();
 </script>
