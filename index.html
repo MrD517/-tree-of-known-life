@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#08111f">
-<title>生命系統樹 β3 — Tree of Known Life</title>
+<title>生命系統樹 β4 — Tree of Known Life</title>
 <style>
   :root{
     --bg:#07101c; --panel:#0d1928; --panel2:#111f31; --line:#33516f;
@@ -30,6 +30,32 @@
   .brand{font-weight:800;white-space:nowrap;letter-spacing:.02em}
   .brand small{display:block;color:var(--muted);font-size:11px;font-weight:500}
   .searchWrap{position:relative;flex:1;max-width:720px}
+  #mobileResults{
+    display:none;
+    position:absolute;
+    left:0;right:0;top:calc(100% + 7px);
+    max-height:min(56vh,460px);
+    overflow:auto;
+    background:rgba(10,23,38,.98);
+    border:1px solid var(--border);
+    border-radius:13px;
+    box-shadow:var(--shadow);
+    z-index:60;
+    padding:6px;
+    -webkit-overflow-scrolling:touch;
+  }
+  #mobileResults.open{display:block}
+  #mobileResults .result{margin:4px 0;background:#0d1d2e}
+  #mobileResults .result:active{background:#173149}
+  #mobileResults .searchHead{
+    padding:7px 8px 5px;
+    font-size:11px;
+    color:var(--muted);
+    position:sticky;
+    top:0;
+    background:rgba(10,23,38,.98);
+    z-index:1;
+  }
   #search{width:100%;background:#0b1726;color:var(--text);border:1px solid var(--border);
     border-radius:12px;padding:11px 42px 11px 13px;outline:none}
   #search:focus{border-color:#5d9ed0;box-shadow:0 0 0 3px rgba(93,158,208,.13)}
@@ -112,6 +138,7 @@
     .brand{font-size:14px}
     .brand small{display:none}
     .searchWrap{order:3;flex-basis:100%;max-width:none}
+    #mobileResults.open{display:block}
     .topBtns{gap:5px}
     .topBtns .desktopOnly{display:none}
     #left{display:none}
@@ -128,10 +155,11 @@
 <body>
 <div id="app">
 <header>
-  <div class="brand">生命系統樹 <span class="muted">β3</span><small>Tree of Known Life — Catalogue of Life Explorer</small></div>
+  <div class="brand">生命系統樹 <span class="muted">β4</span><small>Tree of Known Life — Catalogue of Life Explorer</small></div>
   <div class="searchWrap">
-    <input id="search" placeholder="和名・学名・英名で検索　例：シャチ / Orcinus orca / killer whale">
+    <input id="search" autocomplete="off" placeholder="和名・学名・英名で検索　例：シャチ / Orcinus orca / killer whale">
     <button id="searchBtn" title="検索">⌕</button>
+    <div id="mobileResults" aria-live="polite"></div>
   </div>
   <div class="topBtns">
     <button id="rootBtn" class="desktopOnly">根へ</button>
@@ -161,7 +189,7 @@
     <h3>表示の読み方</h3>
     <div class="legendRow tiny"><span class="legendLine"></span> 系統として補足済みの主要枝</div>
     <div class="legendRow tiny"><span class="legendLine dashed"></span> CoL分類上の親子関係</div>
-    <div class="tiny muted">＋を押すと枝を展開。ノードを押すと名称・年代・出典を表示します。スマホでは1本指ドラッグで移動、2本指ピンチで拡大・縮小できます。</div>
+    <div class="tiny muted">＋を押すと枝を展開。ノードを押すと名称・年代・出典を表示します。スマホでは1本指ドラッグで移動、2本指ピンチで拡大・縮小できます。枝の＋を押してもズーム倍率は変わりません。</div>
   </div>
 
   <div class="section">
@@ -485,6 +513,7 @@
   const loading = document.getElementById("loading");
   const status = document.getElementById("status");
   const resultsEl = document.getElementById("results");
+  const mobileResultsEl = document.getElementById("mobileResults");
 
   function setStatus(msg){ status.textContent = msg; }
   function showLoading(v, msg="読み込み中…"){ loading.style.display=v?"block":"none"; loading.textContent=msg; }
@@ -639,15 +668,31 @@
     render(); fitTree();
   }
 
+  function renderKeepingNode(n){
+    // 枝展開前の「そのノードの画面上の位置」とズーム倍率を保存。
+    // レイアウトが変わっても同じ場所に残す。拡大率は絶対に変えない。
+    const k=state.transform.k;
+    const oldScreenX=state.transform.x+(n._x+NODE_W/2)*k;
+    const oldScreenY=state.transform.y+(n._y+NODE_H/2)*k;
+    render();
+    state.transform.k=k;
+    state.transform.x=oldScreenX-(n._x+NODE_W/2)*k;
+    state.transform.y=oldScreenY-(n._y+NODE_H/2)*k;
+    applyTransform();
+  }
+
   async function loadChildren(n){
     if(n.placeholder) return;
+
     if(n.children!==null){
       n.expanded=!n.expanded;
-      render();
-      fitTree();
+      renderKeepingNode(n);
+      setStatus(`${displayName(n)}：${n.expanded?"展開":"折りたたみ"}`);
       return;
     }
-    n.loading=true; render();
+
+    n.loading=true;
+    renderKeepingNode(n);
     try{
       const kids=await ensureChildren(n,MAX_CHILDREN);
       n.expanded=true;
@@ -659,13 +704,15 @@
       setStatus(`${displayName(n)}：子ノード取得に失敗`);
     }finally{
       n.loading=false;
-      render();
-      fitTree();
+      renderKeepingNode(n);
     }
   }
 
   async function expandDepth(n, depth){
     if(depth<=0 || n.placeholder) return;
+    const k=state.transform.k;
+    const sx=state.transform.x+(n._x+NODE_W/2)*k;
+    const sy=state.transform.y+(n._y+NODE_H/2)*k;
     try{
       await ensureChildren(n,MAX_CHILDREN);
       n.expanded=true;
@@ -674,7 +721,10 @@
       }
     }catch(e){ console.warn(e); }
     render();
-    fitTree();
+    state.transform.k=k;
+    state.transform.x=sx-(n._x+NODE_W/2)*k;
+    state.transform.y=sy-(n._y+NODE_H/2)*k;
+    applyTransform();
   }
 
   function flattenVisible(){
@@ -908,6 +958,35 @@
     return out.replace(/ンン/g,"ン").replace(/ウウ/g,"ウー");
   }
 
+  function closeMobileResults(){
+    mobileResultsEl.classList.remove("open");
+  }
+
+  function openMobileResults(){
+    if(innerWidth<=720 && mobileResultsEl.childElementCount){
+      mobileResultsEl.classList.add("open");
+    }
+  }
+
+  function makeResultElement(x, onPick){
+    const sci=getName(x);
+    const jp=japaneseFromUsage(x) || manualJa(sci);
+    const directVern=stripHtml(x.vernacularName||x.commonName||"");
+    const title=jp || directVern || sci;
+    const subtitle=(title!==sci && sci!=="—") ? sci : "";
+    const el=document.createElement("div");
+    el.className="result";
+    el.innerHTML=`<div><strong>${esc(title)}</strong></div>
+      ${subtitle?`<div class="sci">${esc(subtitle)}</div>`:""}
+      <div class="rank">${esc(rankJa(getRank(x)))}${getStatus(x)?` · ${esc(statusJa(getStatus(x)))}`:""}</div>`;
+    el.addEventListener("click",async()=>{
+      closeMobileResults();
+      document.getElementById("search").blur();
+      await onPick();
+    });
+    return el;
+  }
+
   function normalizeVernacularHit(v){
     const id=getId(v);
     return {
@@ -983,8 +1062,17 @@
         if(!seen.has(key)){seen.add(key);uniq.push(x)}
       }
       uniq.sort((x,y)=>searchScore(y,q)-searchScore(x,q));
-      showResults(uniq.slice(0,30),q);
+      const shown=uniq.slice(0,30);
+      showResults(shown,q);
       setStatus(`「${q}」：${uniq.length} 件の候補${uniq.length>30?"（上位30件を表示）":""}`);
+
+      // 候補が1件だけなら検索＝移動として即座に展開。
+      if(shown.length===1){
+        closeMobileResults();
+        await jumpToSearchResult(shown[0]);
+      }else{
+        openMobileResults();
+      }
     }catch(e){
       console.error(e);
       resultsEl.innerHTML=`<span style="color:#ffadad">検索に失敗しました。少し待って再試行してください。</span>`;
@@ -993,20 +1081,22 @@
   }
 
   function showResults(arr,q){
-    if(!arr.length){resultsEl.innerHTML=`「${esc(q)}」は見つかりませんでした。`;return}
     resultsEl.innerHTML="";
+    mobileResultsEl.innerHTML="";
+
+    if(!arr.length){
+      const msg=`「${esc(q)}」は見つかりませんでした。`;
+      resultsEl.innerHTML=msg;
+      mobileResultsEl.innerHTML=`<div class="searchHead">${msg}</div>`;
+      openMobileResults();
+      return;
+    }
+
+    mobileResultsEl.innerHTML=`<div class="searchHead">候補 ${arr.length} 件 — タップすると系統を開きます</div>`;
+
     for(const x of arr){
-      const sci=getName(x);
-      const jp=japaneseFromUsage(x) || manualJa(sci);
-      const directVern=stripHtml(x.vernacularName||x.commonName||"");
-      const title=jp || directVern || sci;
-      const subtitle=(title!==sci && sci!=="—") ? sci : "";
-      const el=document.createElement("div"); el.className="result";
-      el.innerHTML=`<div><strong>${esc(title)}</strong></div>
-        ${subtitle?`<div class="sci">${esc(subtitle)}</div>`:""}
-        <div class="rank">${esc(rankJa(getRank(x)))}${getStatus(x)?` · ${esc(statusJa(getStatus(x)))}`:""}</div>`;
-      el.addEventListener("click",()=>jumpToSearchResult(x));
-      resultsEl.appendChild(el);
+      resultsEl.appendChild(makeResultElement(x,()=>jumpToSearchResult(x)));
+      mobileResultsEl.appendChild(makeResultElement(x,()=>jumpToSearchResult(x)));
     }
   }
 
@@ -1022,7 +1112,13 @@
         const n=makeNode(x);
         const jpHit=japaneseFromUsage(x);
         if(jpHit) n.common.ja=jpHit;
-        state.roots=[n];render();state.selected=n;await selectNode(n);fitTree();return;
+        state.roots=[n];
+        render();
+        state.selected=n;
+        state.transform.k=Math.max(state.transform.k,.85);
+        centerNode(n);
+        await selectNode(n);
+        return;
       }
 
       // path may be root→target or target→root. Normalize using target id.
@@ -1040,11 +1136,22 @@
       state.roots=[chain[0]];
       const n=chain[chain.length-1];
       state.selected=n;
-      render();fitTree();await selectNode(n);
+      render();
+      // 検索後は「全体を収める」のではなく、該当分類群を読める倍率で中央へ。
+      state.transform.k=Math.max(.82,Math.min(1.15,state.transform.k));
+      centerNode(n);
+      await selectNode(n);
       setStatus(`検索経路: ${chain.map(c=>displayName(c)).join(" → ")}`);
     }catch(e){
       console.error(e);
-      const n=makeNode(x);state.roots=[n];render();fitTree();await selectNode(n);
+      const n=makeNode(x);
+      const jpHit=japaneseFromUsage(x);
+      if(jpHit) n.common.ja=jpHit;
+      state.roots=[n];
+      render();
+      state.transform.k=Math.max(state.transform.k,.85);
+      centerNode(n);
+      await selectNode(n);
     }finally{showLoading(false)}
   }
 
@@ -1220,14 +1327,25 @@
   }
 
   document.getElementById("searchBtn").onclick=()=>search(document.getElementById("search").value);
-  document.getElementById("search").addEventListener("keydown",e=>{if(e.key==="Enter")search(e.currentTarget.value)});
+  document.addEventListener("pointerdown",e=>{
+    if(!e.target.closest(".searchWrap")) closeMobileResults();
+  });
+  document.getElementById("search").addEventListener("keydown",e=>{
+    if(e.key==="Enter") search(e.currentTarget.value);
+    if(e.key==="Escape") closeMobileResults();
+  });
   document.getElementById("zoomIn").onclick=()=>zoom(1.25);
   document.getElementById("zoomOut").onclick=()=>zoom(.8);
   document.getElementById("fitBtn").onclick=fitTree;
   document.getElementById("centerSel").onclick=()=>state.selected?centerNode(state.selected):fitTree();
   document.getElementById("rootBtn").onclick=loadRoots;
   document.getElementById("expand2").onclick=()=>state.selected&&expandDepth(state.selected,2);
-  document.getElementById("collapseBtn").onclick=()=>{if(state.selected){state.selected.expanded=false;render();fitTree()}};
+  document.getElementById("collapseBtn").onclick=()=>{
+    if(state.selected){
+      state.selected.expanded=false;
+      renderKeepingNode(state.selected);
+    }
+  };
   document.getElementById("mobileDetailsBtn").onclick=openDetails;
   document.getElementById("drawerShade").onclick=closeDetails;
   document.getElementById("datasetSel").onchange=e=>{DATASET=e.target.value;state.cache.clear();state.details.clear();loadRoots()};
