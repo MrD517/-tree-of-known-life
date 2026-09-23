@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#08111f">
-<title>生命系統樹 β5 — Tree of Known Life</title>
+<title>生命系統樹 β6 — Tree of Known Life</title>
 <style>
   :root{
     --bg:#07101c; --panel:#0d1928; --panel2:#111f31; --line:#33516f;
@@ -178,7 +178,7 @@
 <body>
 <div id="app">
 <header>
-  <div class="brand">生命系統樹 <span class="muted">β5</span><small>Tree of Known Life — Catalogue of Life Explorer</small></div>
+  <div class="brand">生命系統樹 <span class="muted">β6</span><small>Tree of Known Life — Catalogue of Life Explorer</small></div>
   <div class="searchWrap">
     <input id="search" autocomplete="off" placeholder="和名・学名・英名で検索　例：シャチ / Orcinus orca / killer whale">
     <button id="searchBtn" title="検索">⌕</button>
@@ -237,6 +237,7 @@
     <h3>重要な脚注</h3>
     <ol class="tiny muted">
       <li><strong>分類樹</strong>はCatalogue of Lifeの分類階層、<strong>系統樹</strong>はOpen Tree of Lifeの合成系統樹を表示します。同じ生物でも枝分かれは一致しない場合があります。</li>
+      <li>系統樹の無名内部ノードは「A系統・B系統の分岐点」のような説明名を自動生成します。正式な学名ではありません。</li>
       <li>細菌・古細菌などでは水平遺伝子移動が多く、進化史は完全な一本の「木」で表せない場合があります。</li>
       <li>分岐年代は研究で推定値が得られる主要節のみ表示します。未確定の場所へ架空の数字は入れません。</li>
       <li>和名・英名はデータベースに俗名がある場合のみ表示。カタカナ英名は既存表記が得られない場合、機械音写として明示します。</li>
@@ -460,6 +461,54 @@
     "Odontoceti":"ハクジラ類",
     "Delphinidae":"マイルカ科",
     "Orcinus":"シャチ属",
+    "Pakicetus":"パキケトゥス",
+    "Pakicetidae":"パキケトゥス科",
+    "Ambulocetus":"アンブロケトゥス",
+    "Ambulocetidae":"アンブロケトゥス科",
+    "Indohyus":"インドヒウス",
+    "Maiacetus":"マイアケトゥス",
+    "Remingtonocetidae":"レミングトノケトゥス科",
+    "Protocetidae":"プロトケトゥス科",
+    "Rodhocetus":"ロドケトゥス",
+    "Dorudon":"ドルドン",
+    "Dorudontinae":"ドルドン亜科",
+    "Basilosaurus":"バシロサウルス",
+    "Basilosauridae":"バシロサウルス科",
+    "Archaeoceti":"古鯨類",
+    "Neoceti":"新鯨類",
+    "Mysticeti":"ヒゲクジラ類",
+    "Whippomorpha":"鯨河馬形類",
+    "Hippopotamidae":"カバ科",
+    "Carnivora":"食肉目",
+    "Primates":"霊長目",
+    "Rodentia":"齧歯目",
+    "Lagomorpha":"兎形目",
+    "Chiroptera":"翼手目",
+    "Perissodactyla":"奇蹄目",
+    "Artiodactyla":"偶蹄目",
+    "Proboscidea":"長鼻目",
+    "Sirenia":"海牛目",
+    "Afrotheria":"アフリカ獣類",
+    "Euarchontoglires":"真主齧類",
+    "Boreoeutheria":"北方真獣類",
+    "Xenarthra":"異節類",
+    "Dinosauria":"恐竜類",
+    "Saurischia":"竜盤類",
+    "Ornithischia":"鳥盤類",
+    "Theropoda":"獣脚類",
+    "Sauropodomorpha":"竜脚形類",
+    "Crocodylia":"ワニ目",
+    "Testudines":"カメ目",
+    "Squamata":"有鱗目",
+    "Hominidae":"ヒト科",
+    "Homo":"ヒト属",
+    "Homo sapiens":"ヒト",
+    "Canidae":"イヌ科",
+    "Felidae":"ネコ科",
+    "Ursidae":"クマ科",
+    "Orcinus orca":"シャチ",
+    "Tursiops":"ハンドウイルカ属",
+    "Tursiops truncatus":"ハンドウイルカ",
   };
 
   const JP_RANK = {
@@ -573,6 +622,95 @@
 
   function displayName(n){
     return n?.common?.ja || manualJa(n?.name) || n?.name || "—";
+  }
+
+  function readableTaxonName(name){
+    const raw=String(name||"").trim();
+    if(!raw) return null;
+    return manualJa(raw) || raw;
+  }
+
+  function shortReadableName(name){
+    const v=readableTaxonName(name);
+    if(!v) return null;
+    return v.length>18 ? v.slice(0,17)+"…" : v;
+  }
+
+  function phyloDescendantNames(raw){
+    const arr=Array.isArray(raw?.descendant_name_list) ? raw.descendant_name_list : [];
+    const out=[];
+    const seen=new Set();
+    for(const x of arr){
+      const v=shortReadableName(x);
+      if(v && !seen.has(v)){
+        seen.add(v);
+        out.push(v);
+      }
+      if(out.length>=3) break;
+    }
+    return out;
+  }
+
+  function nearestNamedPhyloParent(n){
+    let p=n?.parent;
+    while(p){
+      if(p.raw?.phylo && p.raw?.taxon?.name){
+        return readableTaxonName(p.raw.taxon.name);
+      }
+      p=p.parent;
+    }
+    return null;
+  }
+
+  function phyloInternalLabel(n){
+    if(!n?.raw?.phylo || n.raw?.taxon?.name) return displayName(n);
+
+    // まず直接の子に実名がある場合、それを説明に使う
+    const childNames=[];
+    for(const c of (n.children||[])){
+      const cname=c.raw?.taxon?.name || (c.name && c.name!=="系統分岐点" ? c.name : null);
+      if(cname){
+        const r=shortReadableName(cname);
+        if(r && !childNames.includes(r)) childNames.push(r);
+      }
+      if(childNames.length>=2) break;
+    }
+
+    if(childNames.length>=2){
+      return `${childNames[0]}系統・${childNames[1]}系統の分岐点`;
+    }
+
+    // OpenTree が返す代表的な子孫名があれば利用
+    const desc=phyloDescendantNames(n.raw);
+    if(desc.length>=2){
+      return `${desc[0]}系統・${desc[1]}系統の分岐点`;
+    }
+
+    // 直近の名前付き祖先があれば、その内部系統として説明
+    const parentName=nearestNamedPhyloParent(n);
+    if(parentName){
+      return `${parentName}内部の分岐点`;
+    }
+
+    return "系統分岐点";
+  }
+
+  function refreshPhyloLabels(root){
+    function walk(n){
+      for(const c of (n.children||[])) walk(c);
+
+      if(n.raw?.phylo){
+        if(n.raw?.taxon?.name){
+          const sci=n.raw.taxon.name;
+          n.name=sci;
+          n.common.ja=manualJa(sci) || null;
+        }else{
+          n.name="系統分岐点";
+          n.common.ja=phyloInternalLabel(n);
+        }
+      }
+    }
+    walk(root);
   }
 
   function hasJapanese(s){
@@ -766,26 +904,32 @@
   }
 
   async function loadRoots(){
-    showLoading(true,"生命の主要枝を展開中…");
+    showLoading(true,"生命の根元を取得中…");
     setStatus("Catalogue of Life に接続中…");
     try{
       const data=await fetchJSON(`${API}${DATASET}/tree`);
       const arr=listFrom(data);
       if(!arr.length) throw new Error("root response empty");
+
       state.roots=arr.map(x=>makeNode(x));
       state.selected=null;
-      render();
-      setStatus("主要枝を自動展開しています…");
-      await autoOpenInitial();
+
+      // β6: 初期自動展開はしない。最上位ノードだけ表示。
+      for(const r of state.roots){
+        r.children=null;
+        r.expanded=false;
+      }
+
       render();
       fitTree();
-      const visible=flattenVisible().length;
-      setStatus(`主要枝を自動展開済み：表示 ${visible} ノード。大量分岐は途中で止めています`);
+      setStatus(`最上位 ${state.roots.length} ノード。見たい枝だけ＋で展開`);
     }catch(e){
       console.error(e);
       setStatus("APIへ接続できません。ネット接続/CORSを確認してください。デモ樹を表示します。");
       loadDemo();
-    }finally{showLoading(false)}
+    }finally{
+      showLoading(false);
+    }
   }
 
   function loadDemo(){
@@ -808,7 +952,7 @@
     ];
     function cv(r,p=null){
       const n=makeNode(r,p);
-      if(r.children){n.children=r.children.map(c=>cv(c,n));n.expanded=true}
+      if(r.children){n.children=r.children.map(c=>cv(c,n));n.expanded=false}
       return n;
     }
     state.roots=demo.map(x=>cv(x));
@@ -1394,7 +1538,7 @@
     const tax=a?.taxon || null;
     const taxName=tax?.name || "";
     const isInternal=!tax;
-    const name=isInternal ? "共通祖先" : (taxName || "名称不明");
+    const name=isInternal ? "系統分岐点" : (taxName || "名称不明");
     const node={
       id:`phylo:${a?.node_id || tax?.ott_id || crypto.randomUUID()}`,
       raw:{
@@ -1417,7 +1561,7 @@
       loading:false,
       placeholder:false,
       hiddenCount:0,
-      common:{ja:isInternal?"共通祖先":manualJa(taxName),en:null,kana:null}
+      common:{ja:isInternal?"系統分岐点":manualJa(taxName),en:null,kana:null}
     };
 
     if(Array.isArray(a?.children)){
@@ -1492,6 +1636,7 @@
       if(!arg) throw new Error("arguson missing");
 
       const root=attachPhyloLineage(arg,jpName);
+      refreshPhyloLabels(root);
       state.roots=[root];
 
       // find target node matching ott id
@@ -1532,7 +1677,10 @@
       const arg=data?.arguson;
       if(!arg) throw new Error("arguson missing");
 
-      state.roots=[makePhyloNode(arg)];
+      const phyRoot=makePhyloNode(arg);
+      refreshPhyloLabels(phyRoot);
+      phyRoot.expanded=false;
+      state.roots=[phyRoot];
       state.selected=null;
       render();
       fitTree();
@@ -1570,6 +1718,7 @@
       if(!arg) throw new Error("arguson missing");
 
       n.children=Array.isArray(arg.children)?arg.children.map(c=>makePhyloNode(c,n)):[];
+      refreshPhyloLabels(n);
       n.expanded=n.children.length>0;
       setStatus(`${displayName(n)}：系統樹を追加展開`);
     }catch(e){
@@ -1583,13 +1732,13 @@
 
   function applyPhyloDetails(n){
     const tax=n.raw?.taxon || {};
-    const sci=tax.name || (n.name==="共通祖先"?"":"") || n.name || "名称不明";
-    const ja=manualJa(sci) || n.common?.ja || (n.name==="共通祖先"?"共通祖先":null);
+    const sci=tax.name || "";
+    const ja=tax.name ? (manualJa(tax.name) || n.common?.ja) : (n.common?.ja || phyloInternalLabel(n));
 
     document.getElementById("dJa").textContent=ja || sci || "名称不明";
     document.getElementById("dKana").textContent="";
     document.getElementById("dEn").textContent="";
-    document.getElementById("dSci").textContent=(ja && sci && ja!==sci)?sci:"";
+    document.getElementById("dSci").textContent=(sci && ja!==sci)?sci:"";
 
     document.getElementById("dChips").innerHTML=
       `<span class="chip rank">${esc(rankJa(n.rank))}</span>`+
@@ -1614,9 +1763,9 @@
     document.getElementById("dStats").innerHTML=stats.map(([a,b])=>`<div class="stat"><span class="muted">${esc(a)}</span><span>${esc(b)}</span></div>`).join("");
     document.getElementById("dVern").textContent=ja&&ja!==sci?ja:"—";
     document.getElementById("dNote").innerHTML=
-      n.name==="共通祖先"
-      ? `名称が付いていない合成系統樹上の内部ノードです。分類階級ではなく、系統関係から置かれた共通祖先ノードとして表示しています。`
-      : `Open Tree of Life の合成系統樹に基づくノードです。Catalogue of Life の分類上の親子関係とは別データです。`;
+      !tax.name
+      ? `Open Tree of Life上で固有の分類名が付いていない内部ノードです。画面では子孫・近縁群の名前から「何と何が分かれる場所か」が分かる説明名を自動生成しています。これは正式な学名ではありません。`
+      : `Open Tree of Life の合成系統樹に基づく実在の分類群ノードです。日本語名・一般的なカタカナ名が登録済みの場合はそちらを優先表示します。`;
   }
 
   async function switchMode(mode){
