@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#08111f">
-<title>生命系統樹 β14 — Tree of Known Life</title>
+<title>生命系統樹 β15 — Tree of Known Life</title>
 <style>
   :root{
     --bg:#07101c; --panel:#0d1928; --panel2:#111f31; --line:#33516f;
@@ -237,7 +237,7 @@
 <body>
 <div id="app">
 <header>
-  <div class="brand">生命系統樹 <span class="muted">β14</span><small>Tree of Known Life — Catalogue of Life Explorer</small></div>
+  <div class="brand">生命系統樹 <span class="muted">β15</span><small>Tree of Known Life — Catalogue of Life Explorer</small></div>
   <div class="searchWrap">
     <input id="search" autocomplete="off" placeholder="和名・学名・英名で検索　例：シャチ / Orcinus orca / killer whale">
     <button id="searchBtn" title="検索">⌕</button>
@@ -276,7 +276,7 @@
     <div class="legendRow tiny"><span class="legendLine"></span> 系統として補足済みの主要枝</div>
     <div class="legendRow tiny"><span class="legendLine dashed"></span> CoL分類上の親子関係</div>
     <div class="legendRow tiny"><span class="legendLine" style="border-top-color:#ff9f43;border-top-width:3px"></span> 検索した生物までのルート</div>
-    <div class="tiny muted">＋を押すと枝を展開。ノードを押すと名称・年代・出典を表示します。スマホでは1本指ドラッグで移動、2本指ピンチで拡大・縮小できます。枝の＋では倍率を変えず、子が画面外なら年代位置まで自動で横移動します。</div>
+    <div class="tiny muted">＋を押すと枝を展開。ノードを押すと名称・年代・出典を表示します。スマホでは1本指ドラッグで移動、2本指ピンチで拡大・縮小できます。拡大するほど年代方向と上下方向のノード間隔も追加で広がるため、密集した枝をほどいて読めます。</div>
   </div>
 
   <div class="section">
@@ -300,7 +300,7 @@
       <li>系統樹の無名内部ノードは「A系統・B系統の分岐点」のような説明名を自動生成します。正式な学名ではありません。</li>
       <li>細菌・古細菌などでは水平遺伝子移動が多く、進化史は完全な一本の「木」で表せない場合があります。</li>
       <li>上部の地質年代タイムラインはICS 2026/06準拠です。選択ノードの年代に応じて「地球史 → 顕生代 → 新生代 → 第四紀」と自動的に拡大します。枝の横幅そのものは年代比例ではありません。</li>
-      <li>表示名は「確認済みの日本語名」がある場合だけ日本語にします。内蔵の確認済み名称とCatalogue of Lifeで明示的に日本語登録された俗名のみ使用し、見つからなければ学名をそのまま表示します。自動翻訳・中国語ラベル・Wikipedia検索結果による補完は使いません。</li>
+      <li>表示名は日本語優先です。確認済み内蔵名称 → Catalogue of Lifeの日本語俗名 → GBIFの日本語俗名 → iNaturalistの日本語名（学名完全一致・locale=ja）の順に照合します。どこにも日本語名を確認できない場合だけ学名のまま表示し、自動翻訳・中国語ラベル・Wikipedia検索結果は使いません。</li>
       <li>Catalogue of Lifeが絶滅フラグを持つ分類群は「†」と「絶滅」を表示します。化石年代の収録には差があるため、絶滅年代が不明な場合は不明のままです。</li>
       <li>ウイルスは「生物か」の定義が議論されるため、CoLに含まれる分類は表示しますが生命樹上の扱いには注意が必要です。</li>
     </ol>
@@ -1058,26 +1058,38 @@
 
 
   const TIME_MAX_MA = 4600;
-  const TIME_PX_PER_MA = 4.0; // world-space scale; zoom controls readable detail
+  const TIME_PX_PER_MA = 4.0;
 
   function clampAge(age){
     return Math.max(0,Math.min(TIME_MAX_MA,Number(age)||0));
   }
 
-  function ageToWorldX(age){
-    return (TIME_MAX_MA-clampAge(age))*TIME_PX_PER_MA;
+  function semanticSpread(k=state.transform.k){
+    // k controls the size of nodes. This second factor controls the
+    // extra space BETWEEN nodes, so zooming in "untangles" dense clades.
+    const base=.80;
+    return Math.max(.72,Math.min(5.5,Math.pow(Math.max(.08,k)/base,.72)));
   }
 
-  function worldXToAge(x){
-    return clampAge(TIME_MAX_MA-(Number(x)||0)/TIME_PX_PER_MA);
+  function verticalSpread(k=state.transform.k){
+    return Math.max(.82,Math.min(3.1,Math.pow(semanticSpread(k),.58)));
+  }
+
+  function ageToWorldX(age,k=state.transform.k){
+    return (TIME_MAX_MA-clampAge(age))*TIME_PX_PER_MA*semanticSpread(k);
+  }
+
+  function worldXToAge(x,k=state.transform.k){
+    const scale=TIME_PX_PER_MA*semanticSpread(k);
+    return clampAge(TIME_MAX_MA-(Number(x)||0)/scale);
   }
 
   function ageToScreenX(age){
-    return state.transform.x + ageToWorldX(age)*state.transform.k;
+    return state.transform.x + ageToWorldX(age,state.transform.k)*state.transform.k;
   }
 
   function screenXToAge(x){
-    return worldXToAge((x-state.transform.x)/state.transform.k);
+    return worldXToAge((x-state.transform.x)/state.transform.k,state.transform.k);
   }
 
   function directNodeAge(n){
@@ -1549,7 +1561,7 @@
     return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));
   }
 
-  const JP_CACHE_VERSION = "jp-v6";
+  const JP_CACHE_VERSION = "jp-v7";
 
   function jpCacheKey(kind,idOrName){
     return `lifeTree:${JP_CACHE_VERSION}:${DATASET}:${kind}:${String(idOrName||"")}`;
@@ -1662,29 +1674,128 @@
     }
   }
 
+  function strictJapaneseCandidate(name,sci=""){
+    const v=String(name||"").trim();
+    if(!v || !hasJapanese(v)) return null;
+    if(SIMPLIFIED_ONLY_RE.test(v)) return null;
+    if(/分類学|taxonomy|^門[（(]|^綱[（(]|^目[（(]|^科[（(]|^属[（(]|^種[（(]/i.test(v)) return null;
+    if(GENERIC_EXTERNAL_JA.has(v) && manualJa(sci)!==v) return null;
+    return v;
+  }
+
+  async function gbifJapaneseName(sci){
+    if(!sci) return null;
+
+    const cached=getCachedJapanese("gbif-ja",sci);
+    if(cached!==undefined) return cached;
+
+    try{
+      const match=await fetchJSON(
+        `https://api.gbif.org/v1/species/match?name=${encodeURIComponent(sci)}&strict=true`
+      );
+
+      const matchedSci=String(
+        match?.scientificName || match?.canonicalName || ""
+      ).trim();
+
+      // Exact identity only. If GBIF falls back to another taxon, reject it.
+      if(!matchedSci || matchedSci.toLowerCase()!==String(sci).trim().toLowerCase()){
+        setCachedJapanese("gbif-ja",sci,null);
+        return null;
+      }
+
+      const key=match?.usageKey ?? match?.key ?? match?.speciesKey;
+      if(!key){
+        setCachedJapanese("gbif-ja",sci,null);
+        return null;
+      }
+
+      const data=await fetchJSON(
+        `https://api.gbif.org/v1/species/${encodeURIComponent(key)}/vernacularNames?limit=100`
+      );
+      const rows=Array.isArray(data?.results)?data.results:(Array.isArray(data)?data:[]);
+
+      const found=rows.find(v=>{
+        const lang=String(v?.language||v?.lang||"").toLowerCase();
+        const name=v?.vernacularName ?? v?.name ?? "";
+        return /^(ja|jpn|japanese)$/.test(lang) &&
+          !!strictJapaneseCandidate(name,sci);
+      });
+
+      const jp=found ? strictJapaneseCandidate(found.vernacularName ?? found.name,sci) : null;
+      setCachedJapanese("gbif-ja",sci,jp);
+      return jp;
+    }catch(e){
+      console.warn("GBIF Japanese lookup failed",sci,e);
+      return null;
+    }
+  }
+
+  async function inatJapaneseName(sci){
+    if(!sci) return null;
+
+    const cached=getCachedJapanese("inat-ja",sci);
+    if(cached!==undefined) return cached;
+
+    try{
+      const data=await fetchJSON(
+        `https://api.inaturalist.org/v1/taxa?q=${encodeURIComponent(sci)}&locale=ja&per_page=10`
+      );
+      const rows=Array.isArray(data?.results)?data.results:[];
+
+      const exact=rows.find(x=>
+        String(x?.name||"").trim().toLowerCase()===String(sci).trim().toLowerCase()
+      );
+
+      const jp=strictJapaneseCandidate(exact?.preferred_common_name||"",sci);
+      setCachedJapanese("inat-ja",sci,jp);
+      return jp;
+    }catch(e){
+      console.warn("iNaturalist Japanese lookup failed",sci,e);
+      return null;
+    }
+  }
+
   async function resolveJapaneseName(sci,id=null){
     const manual=manualJa(sci);
     if(manual) return {name:manual,source:"確認済み日本語辞書"};
 
-    const cached=getCachedJapanese("strict-ja",`${id||""}:${sci}`);
+    const cacheKey=`${id||""}:${sci}`;
+    const cached=getCachedJapanese("resolved-strict-ja",cacheKey);
     if(cached!==undefined){
-      return cached ? {name:cached,source:"Catalogue of Life"} : {name:null,source:null};
+      return cached ? {name:cached,source:"日本語名キャッシュ"} : {name:null,source:null};
     }
 
-    // Only accept vernacular names explicitly tagged as Japanese by CoL.
-    // If none exist, leave the scientific name untouched.
+    // 1. Catalogue of Life — only explicitly Japanese vernacular names.
     if(id){
       try{
         const data=await fetchJSON(`${API}${DATASET}/taxon/${encodeURIComponent(id)}/vernacular`);
         const jp=findJapaneseVernacular(data,sci);
-        setCachedJapanese("strict-ja",`${id}:${sci}`,jp);
-        if(jp) return {name:jp,source:"Catalogue of Life"};
+        if(jp){
+          setCachedJapanese("resolved-strict-ja",cacheKey,jp);
+          return {name:jp,source:"Catalogue of Life"};
+        }
       }catch(e){
         console.warn("CoL Japanese vernacular failed",id,e);
       }
     }
 
-    setCachedJapanese("strict-ja",`${id||""}:${sci}`,null);
+    // 2. GBIF — exact scientific-name match + explicitly Japanese vernacular.
+    const gb=await gbifJapaneseName(sci);
+    if(gb){
+      setCachedJapanese("resolved-strict-ja",cacheKey,gb);
+      return {name:gb,source:"GBIF"};
+    }
+
+    // 3. iNaturalist — exact scientific-name match, locale=ja.
+    const ina=await inatJapaneseName(sci);
+    if(ina){
+      setCachedJapanese("resolved-strict-ja",cacheKey,ina);
+      return {name:ina,source:"iNaturalist"};
+    }
+
+    // Never machine-translate taxonomic names.
+    setCachedJapanese("resolved-strict-ja",cacheKey,null);
     return {name:null,source:null};
   }
 
@@ -1875,7 +1986,7 @@
     if(!kids.length) return;
 
     try{
-      await hydrateJapaneseNodes(kids,5);
+      await hydrateJapaneseNodes(kids,3);
       sanitizeSiblingJapaneseLabels(parent);
     }catch(e){
       console.warn("background Japanese hydration failed",e);
@@ -2131,6 +2242,8 @@
     // Ages must be assigned after the currently visible tree is known.
     assignTimelineAges();
 
+    const semanticDY=DY*verticalSpread(state.transform.k);
+
     function rec(n,depth){
       const kids=(n.expanded && n.children && n.children.length)?n.children:null;
       let y;
@@ -2139,12 +2252,12 @@
         const ys=kids.map(c=>rec(c,depth+1).y);
         y=(ys[0]+ys[ys.length-1])/2;
       }else{
-        y=leaf*DY;
+        y=leaf*semanticDY;
         leaf++;
       }
 
       const age=Number.isFinite(n._layoutAge) ? n._layoutAge : 0;
-      n._timeX=ageToWorldX(age);
+      n._timeX=ageToWorldX(age,state.transform.k);
       n._x=n._timeX-NODE_W/2;
       n._y=y;
       return {x:n._x,y:n._y};
@@ -2156,8 +2269,8 @@
     }
 
     return {
-      width:ageToWorldX(0)+NODE_W+200,
-      height:Math.max(450,leaf*DY+120)
+      width:ageToWorldX(0,state.transform.k)+NODE_W+200,
+      height:Math.max(450,leaf*semanticDY+120)
     };
   }
 
@@ -3122,11 +3235,35 @@
     stage.setAttribute("transform",`translate(${state.transform.x},${state.transform.y}) scale(${state.transform.k})`);
     renderGeoTimeline(state.selected);
   }
+  function baseYAtScreen(screenY,k=state.transform.k){
+    const worldY=(screenY-state.transform.y)/k;
+    return worldY/verticalSpread(k);
+  }
+
+  function semanticRelayout(nk,screenX,screenY,anchorAge,anchorBaseY){
+    state.transform.k=nk;
+
+    // Recompute x/y because spacing itself depends on zoom.
+    render();
+
+    // Keep the same geological time beneath the fingers/cursor.
+    state.transform.x=
+      screenX-ageToWorldX(anchorAge,nk)*nk;
+
+    // Keep the same vertical tree position beneath the fingers/cursor.
+    state.transform.y=
+      screenY-(anchorBaseY*verticalSpread(nk))*nk;
+
+    applyTransform();
+  }
+
   function zoom(factor,cx=svg.clientWidth/2,cy=svg.clientHeight/2){
     const old=state.transform.k;
+    const anchorAge=screenXToAge(cx);
+    const anchorBaseY=baseYAtScreen(cy,old);
     const nk=Math.min(5,Math.max(.10,old*factor));
-    const wx=(cx-state.transform.x)/old, wy=(cy-state.transform.y)/old;
-    state.transform.x=cx-wx*nk; state.transform.y=cy-wy*nk; state.transform.k=nk; applyTransform();
+
+    semanticRelayout(nk,cx,cy,anchorAge,anchorBaseY);
   }
   function fitTree(){
     const nodes=flattenVisible().map(x=>x.n);
@@ -3221,8 +3358,8 @@
         pinchStart={
           distance:m.distance,
           startK:state.transform.k,
-          worldX:(m.midX-state.transform.x)/state.transform.k,
-          worldY:(m.midY-state.transform.y)/state.transform.k
+          anchorAge:screenXToAge(m.midX),
+          anchorBaseY:baseYAtScreen(m.midY,state.transform.k)
         };
       }
       suppressClickUntil=Date.now()+400;
@@ -3241,12 +3378,15 @@
       const ratio=m.distance/pinchStart.distance;
       const nk=Math.min(5,Math.max(.10,pinchStart.startK*ratio));
 
-      // 最初に2本指でつまんだ「樹上の地点」が、
-      // 現在の2本指の中心に居続けるように変換する。
-      state.transform.k=nk;
-      state.transform.x=m.midX-pinchStart.worldX*nk;
-      state.transform.y=m.midY-pinchStart.worldY*nk;
-      applyTransform();
+      // Preserve geological time + tree position under the pinch center,
+      // while node spacing expands faster than the boxes themselves.
+      semanticRelayout(
+        nk,
+        m.midX,
+        m.midY,
+        pinchStart.anchorAge,
+        pinchStart.anchorBaseY
+      );
       suppressClickUntil=Date.now()+350;
       return;
     }
