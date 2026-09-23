@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#08111f">
-<title>生命系統樹 β9 — Tree of Known Life</title>
+<title>生命系統樹 β10 — Tree of Known Life</title>
 <style>
   :root{
     --bg:#07101c; --panel:#0d1928; --panel2:#111f31; --line:#33516f;
@@ -114,9 +114,18 @@
   #stage{transform-origin:0 0}
   .link{fill:none;stroke:#426681;stroke-width:1.5;opacity:.88}
   .link.classification{stroke-dasharray:5 4;opacity:.72}
+  .link.searchPath{
+    stroke:#ff9f43 !important;
+    stroke-width:3.2 !important;
+    stroke-dasharray:none !important;
+    opacity:1 !important;
+  }
   .nodeBox{fill:var(--node);stroke:#31506b;stroke-width:1}
   .nodeBox:hover{fill:var(--nodeHover)}
   .nodeBox.selected{fill:var(--selected);stroke:#77d8c8;stroke-width:2}
+  .nodeBox.searchPath{stroke:#d97c2b;stroke-width:2}
+  .nodeBox.searchTarget{stroke:#ff9f43;stroke-width:3;fill:#493322}
+  .nodeTimeInferred{fill:#b78d68;font-size:8px;pointer-events:none}
   .nodeText{fill:var(--text);font-size:12px;pointer-events:none}
   .nodeSub{fill:#93abc0;font-size:10px;pointer-events:none}
   .nodeAge{fill:#ffd28a;font-size:9px;pointer-events:none}
@@ -153,7 +162,7 @@
     font-size:9px;color:#8299ad;white-space:nowrap;
   }
   .geoTop strong{font-size:10px;color:#b9ccdc;font-weight:650}
-  .geoScale{position:absolute;left:12px;right:12px;top:25px;height:57px}
+  .geoScale{position:absolute;left:0;right:0;top:25px;height:57px}
   .geoBand{
     position:absolute;overflow:hidden;border-left:1px solid rgba(159,190,214,.20);
     border-right:1px solid rgba(10,20,32,.35);
@@ -223,7 +232,7 @@
 <body>
 <div id="app">
 <header>
-  <div class="brand">生命系統樹 <span class="muted">β9</span><small>Tree of Known Life — Catalogue of Life Explorer</small></div>
+  <div class="brand">生命系統樹 <span class="muted">β10</span><small>Tree of Known Life — Catalogue of Life Explorer</small></div>
   <div class="searchWrap">
     <input id="search" autocomplete="off" placeholder="和名・学名・英名で検索　例：シャチ / Orcinus orca / killer whale">
     <button id="searchBtn" title="検索">⌕</button>
@@ -261,6 +270,7 @@
     <h3>表示の読み方</h3>
     <div class="legendRow tiny"><span class="legendLine"></span> 系統として補足済みの主要枝</div>
     <div class="legendRow tiny"><span class="legendLine dashed"></span> CoL分類上の親子関係</div>
+    <div class="legendRow tiny"><span class="legendLine" style="border-top-color:#ff9f43;border-top-width:3px"></span> 検索した生物までのルート</div>
     <div class="tiny muted">＋を押すと枝を展開。ノードを押すと名称・年代・出典を表示します。スマホでは1本指ドラッグで移動、2本指ピンチで拡大・縮小できます。枝の＋を押してもズーム倍率は変わりません。</div>
   </div>
 
@@ -1002,6 +1012,8 @@
     mode:"taxonomy",
     taxonomySaved:null,
     geoWindow:"earth",
+    searchPathIds:new Set(),
+    searchTargetId:null,
     transform:{x:60,y:115,k:1},
     dragging:false,
     dragStart:null,
@@ -1019,6 +1031,141 @@
   function setStatus(msg){ status.textContent = msg; }
   function showLoading(v, msg="読み込み中…"){ loading.style.display=v?"block":"none"; loading.textContent=msg; }
 
+
+  const TIME_MAX_MA = 4600;
+  const TIME_PX_PER_MA = 4.0; // world-space scale; zoom controls readable detail
+
+  function clampAge(age){
+    return Math.max(0,Math.min(TIME_MAX_MA,Number(age)||0));
+  }
+
+  function ageToWorldX(age){
+    return (TIME_MAX_MA-clampAge(age))*TIME_PX_PER_MA;
+  }
+
+  function worldXToAge(x){
+    return clampAge(TIME_MAX_MA-(Number(x)||0)/TIME_PX_PER_MA);
+  }
+
+  function ageToScreenX(age){
+    return state.transform.x + ageToWorldX(age)*state.transform.k;
+  }
+
+  function screenXToAge(x){
+    return worldXToAge((x-state.transform.x)/state.transform.k);
+  }
+
+  function directNodeAge(n){
+    if(!n) return null;
+
+    if(n._timeInferred){
+      const inf=document.createElementNS("http://www.w3.org/2000/svg","text");
+      inf.setAttribute("x",NODE_W-8);
+      inf.setAttribute("y",11);
+      inf.setAttribute("text-anchor","end");
+      inf.setAttribute("class","nodeTimeInferred");
+      inf.textContent="年代位置≈";
+      g.appendChild(inf);
+    }
+
+    const a=AGE[n.name];
+    if(a && !n._timeInferred){
+      return {
+        age:(a.min+a.max)/2,
+        source:"年代研究",
+        inferred:false
+      };
+    }
+
+    const r=nodeTimeRange(n);
+    if(r && r.source!=="現生"){
+      // A taxon range is not automatically a divergence time. Use its midpoint
+      // only as a visual occurrence anchor.
+      return {
+        age:(r.older+r.younger)/2,
+        source:r.source,
+        inferred:false
+      };
+    }
+
+    const terminalRank=new Set([
+      "species","subspecies","variety","form","strain",
+      "nothospecies","cultivar"
+    ]);
+    if(n.extinct!==true && terminalRank.has(String(n.rank||"").toLowerCase())){
+      return {age:0,source:"現生種",inferred:false};
+    }
+
+    return null;
+  }
+
+  function maxKnownDescendantAge(n){
+    let best=null;
+    function walk(x){
+      for(const c of (x.children||[])){
+        const d=directNodeAge(c);
+        if(d){
+          best=best===null?d.age:Math.max(best,d.age);
+        }
+        if(c.expanded && c.children) walk(c);
+      }
+    }
+    walk(n);
+    return best;
+  }
+
+  function assignTimelineAges(){
+    // First pass: direct scientific/date anchors.
+    for(const {n} of flattenVisible()){
+      const d=directNodeAge(n);
+      n._layoutAge=d?.age ?? null;
+      n._timeInferred=false;
+      n._timeSource=d?.source || null;
+    }
+
+    // Top-down interpolation. Undated nodes get a *layout-only* estimate,
+    // never presented as a measured divergence age.
+    function walk(n,parentAge=null,depth=0){
+      if(n._layoutAge===null){
+        const descendant=maxKnownDescendantAge(n);
+
+        if(parentAge!==null && descendant!==null && parentAge>=descendant){
+          n._layoutAge=(parentAge+descendant)/2;
+        }else if(parentAge!==null){
+          // Move monotonically toward present without pretending this is a date.
+          n._layoutAge=Math.max(0,parentAge*0.62);
+        }else if(descendant!==null){
+          n._layoutAge=Math.min(TIME_MAX_MA,descendant+Math.max(20,descendant*.35));
+        }else{
+          // Root-level undated domain fallback; explicitly flagged as layout inference.
+          n._layoutAge=Math.max(0,TIME_MAX_MA*Math.pow(.62,depth+1));
+        }
+
+        n._timeInferred=true;
+        n._timeSource="系統位置からの表示用補間";
+      }
+
+      for(const c of (n.children||[])){
+        if(n.expanded) walk(c,n._layoutAge,depth+1);
+      }
+    }
+
+    for(const r of state.roots) walk(r,null,0);
+
+    // Enforce parent older-than-child ordering where interpolation collided.
+    function order(n){
+      for(const c of (n.children||[])){
+        if(!n.expanded) continue;
+        if(c._layoutAge>=n._layoutAge){
+          c._layoutAge=Math.max(0,n._layoutAge*.88);
+          c._timeInferred=true;
+          c._timeSource="親子順序を保つ表示用補間";
+        }
+        order(c);
+      }
+    }
+    for(const r of state.roots) order(r);
+  }
 
   function formatMa(ma){
     if(ma===0) return "現在";
@@ -1084,98 +1231,110 @@
     return "earth";
   }
 
-  function renderGeoTimeline(n=null){
-    const range=nodeTimeRange(n);
-    const key=chooseGeoWindow(range);
-    state.geoWindow=key;
-    const w=GEO_WINDOWS[key];
-
+  function renderGeoTimeline(n=state.selected){
     const bands=document.getElementById("geoBands");
     const ticks=document.getElementById("geoTicks");
     const sel=document.getElementById("geoSelection");
     const title=document.getElementById("geoTitle");
     const readoutEl=document.getElementById("geoReadout");
-    if(!bands || !ticks || !sel || !title || !readoutEl) return;
+    if(!bands || !ticks || !sel || !title || !readoutEl || !svg.clientWidth) return;
 
-    title.textContent=w.title;
+    const leftAge=screenXToAge(0);
+    const rightAge=screenXToAge(svg.clientWidth);
+    const older=Math.max(leftAge,rightAge);
+    const younger=Math.min(leftAge,rightAge);
+    const span=Math.max(.000001,older-younger);
 
-    let readout=w.readout;
-    if(n){
-      if(n.extinct===true){
-        readout=`${displayName(n)}：絶滅`;
-        if(range && (range.older!==0 || range.younger!==0)){
-          readout+=`・${formatMa(range.older)}〜${formatMa(range.younger)}`;
-        }
-      }else if(range && (range.older!==0 || range.younger!==0)){
-        readout=`${displayName(n)}：${formatMa(range.older)}〜${formatMa(range.younger)}`;
-      }else if(n.extinct===false){
-        readout=`${displayName(n)}：現生`;
-      }else{
-        readout=`${displayName(n)}：年代情報なし`;
+    let row1=[], row2=[], titleText="地球史";
+    if(span>1200){
+      row1=GEO_WINDOWS.earth.major;
+      row2=GEO_WINDOWS.earth.minor;
+      titleText="地球史";
+    }else if(span>120){
+      row1=GEO_WINDOWS.phanerozoic.major;
+      row2=GEO_WINDOWS.phanerozoic.minor;
+      titleText="顕生代";
+    }else if(span>8){
+      row1=GEO_WINDOWS.cenozoic.major;
+      row2=GEO_WINDOWS.cenozoic.minor;
+      titleText="新生代";
+    }else{
+      row1=GEO_WINDOWS.quaternary.major;
+      row2=GEO_WINDOWS.quaternary.minor;
+      titleText="第四紀";
+    }
+
+    title.textContent=titleText;
+    readoutEl.textContent=`${formatMa(older)} → ${formatMa(younger)}`;
+
+    function drawBand(row,cls){
+      for(const [label,o,y] of row){
+        if(y>older || o<younger) continue;
+        const x1=ageToScreenX(o);
+        const x2=ageToScreenX(y);
+        const left=Math.max(0,Math.min(x1,x2));
+        const right=Math.min(svg.clientWidth,Math.max(x1,x2));
+        const width=Math.max(0,right-left);
+        if(width<1) continue;
+
+        const el=document.createElement("div");
+        el.className=`geoBand ${cls}`;
+        el.style.left=`${left}px`;
+        el.style.width=`${width}px`;
+        if(width>34) el.textContent=label;
+        bands.appendChild(el);
       }
     }
-    readoutEl.textContent=readout;
 
     bands.innerHTML="";
-    for(const [label,older,younger] of w.major){
-      const el=document.createElement("div");
-      el.className="geoBand major";
-      const l=geoPos(older,w), r=geoPos(younger,w);
-      el.style.left=`${l}%`;
-      el.style.width=`${Math.max(.15,r-l)}%`;
-      if((r-l)>2.2) el.textContent=label;
-      bands.appendChild(el);
-    }
-    for(const [label,older,younger] of w.minor){
-      const el=document.createElement("div");
-      el.className="geoBand minor";
-      const l=geoPos(older,w), r=geoPos(younger,w);
-      el.style.left=`${l}%`;
-      el.style.width=`${Math.max(.15,r-l)}%`;
-      if((r-l)>3.1) el.textContent=label;
-      bands.appendChild(el);
-    }
+    drawBand(row1,"major");
+    drawBand(row2,"minor");
 
+    // Nice dynamic ticks in Ma.
+    const rough=span/5;
+    const powers=[1,2,5];
+    const exp=Math.pow(10,Math.floor(Math.log10(rough)));
+    let step=powers.map(v=>v*exp).find(v=>v>=rough) || 10*exp;
+    if(step<=0) step=1;
+
+    const first=Math.ceil(younger/step)*step;
     ticks.innerHTML="";
-    for(const age of w.ticks){
-      const pos=geoPos(age,w);
+    for(let age=first;age<=older+step*.01;age+=step){
+      const x=ageToScreenX(age);
+      if(x<0 || x>svg.clientWidth) continue;
+
       const tick=document.createElement("div");
       tick.className="geoTick";
-      tick.style.left=`${pos}%`;
+      tick.style.left=`${x}px`;
       ticks.appendChild(tick);
 
       const lab=document.createElement("div");
       lab.className="geoTickLabel";
-      lab.style.left=`${pos}%`;
+      lab.style.left=`${x}px`;
       lab.textContent=formatMa(age);
       ticks.appendChild(lab);
     }
 
     sel.innerHTML="";
-    if(range){
-      const older=Math.min(w.older,Math.max(w.younger,range.older));
-      const younger=Math.min(w.older,Math.max(w.younger,range.younger));
-      const p1=geoPos(Math.max(older,younger),w);
-      const p2=geoPos(Math.min(older,younger),w);
+    if(n){
+      const d=directNodeAge(n);
+      const age=d?.age ?? n._layoutAge;
+      if(Number.isFinite(age)){
+        const x=ageToScreenX(age);
+        if(x>=0 && x<=svg.clientWidth){
+          const point=document.createElement("div");
+          point.className="geoSelectionPoint";
+          point.style.left=`${x}px`;
+          sel.appendChild(point);
 
-      if(Math.abs(p2-p1)<0.55){
-        const point=document.createElement("div");
-        point.className="geoSelectionPoint";
-        point.style.left=`${p1}%`;
-        sel.appendChild(point);
-      }else{
-        const rr=document.createElement("div");
-        rr.className="geoSelectionRange";
-        rr.style.left=`${Math.min(p1,p2)}%`;
-        rr.style.width=`${Math.max(.25,Math.abs(p2-p1))}%`;
-        sel.appendChild(rr);
+          const lab=document.createElement("div");
+          lab.className="geoSelectionLabel";
+          lab.style.left=`${x}px`;
+          lab.textContent=n._timeInferred ? "位置は補間" :
+            (n.extinct===true ? "絶滅群" : (d?.source || "年代"));
+          sel.appendChild(lab);
+        }
       }
-
-      const lab=document.createElement("div");
-      lab.className="geoSelectionLabel";
-      lab.style.left=`${(p1+p2)/2}%`;
-      lab.textContent=n?.extinct===true ? "絶滅群" : (range.source||"年代");
-      sel.appendChild(lab);
     }
   }
 
@@ -1374,7 +1533,7 @@
     return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));
   }
 
-  const JP_CACHE_VERSION = "jp-v2";
+  const JP_CACHE_VERSION = "jp-v4";
 
   function jpCacheKey(kind,idOrName){
     return `lifeTree:${JP_CACHE_VERSION}:${DATASET}:${kind}:${String(idOrName||"")}`;
@@ -1406,18 +1565,41 @@
 
     const byLang=arr.find(v=>{
       const lang=vernLang(v);
-      return /^(ja|jpn|japanese)$/.test(lang) && !!vernName(v);
+      const name=vernName(v);
+      return /^(ja|jpn|japanese)$/.test(lang) &&
+        !!name && !SIMPLIFIED_ONLY_RE.test(name);
     });
     if(byLang) return vernName(byLang);
 
-    const byChars=arr.find(v=>hasJapanese(vernName(v)));
+    const byChars=arr.find(v=>{
+      const name=vernName(v);
+      return hasJapanese(name) && !SIMPLIFIED_ONLY_RE.test(name);
+    });
     return byChars ? vernName(byChars) : null;
   }
 
-  function looksLikeJapaneseTaxonLabel(label){
+  const SIMPLIFIED_ONLY_RE = /[龙鱼鸟马龟贝门纲类鲸鲨兽鳞齿鳃亚总华东为个这长条]/;
+  const GENERIC_EXTERNAL_JA = new Set([
+    "動物","植物","生物","魚","魚類","鳥","鳥類","虫","昆虫",
+    "哺乳類","爬虫類","両生類","菌","菌類","細菌","古細菌"
+  ]);
+
+  function hasKana(v){
+    return /[ぁ-んァ-ヶ]/.test(String(v||""));
+  }
+
+  function looksLikeJapaneseTaxonLabel(label,sci=""){
     const v=String(label||"").trim();
     if(!v || !hasJapanese(v)) return false;
     if(v.length>45) return false;
+
+    // Japanese search APIs can occasionally fall back to Chinese-looking labels.
+    if(SIMPLIFIED_ONLY_RE.test(v)) return false;
+
+    // Broad labels such as 「動物」 are valid for Animalia but disastrous as
+    // fallback labels for unrelated phyla/classes.
+    if(GENERIC_EXTERNAL_JA.has(v) && manualJa(sci)!==v) return false;
+
     return true;
   }
 
@@ -1443,7 +1625,7 @@
       const good=rows.find(x=>{
         const label=String(x?.label||"");
         const desc=String(x?.description||"");
-        return looksLikeJapaneseTaxonLabel(label) && looksTaxonomicDescription(desc);
+        return looksLikeJapaneseTaxonLabel(label,sci) && looksTaxonomicDescription(desc);
       });
 
       const name=good?.label || null;
@@ -1473,7 +1655,7 @@
       const good=rows.find(x=>{
         const title=String(x?.title||"");
         const snippet=stripHtml(x?.snippet||"").toLowerCase();
-        return looksLikeJapaneseTaxonLabel(title) && snippet.includes(lower);
+        return looksLikeJapaneseTaxonLabel(title,sci) && snippet.includes(lower);
       });
 
       const name=good?.title || null;
@@ -1654,6 +1836,18 @@
       const vals=Object.values(data).filter(v=>v && typeof v==="object" && getId(v));
       if(vals.length) arr=vals;
     }
+    const dedup=[];
+    const seenTaxa=new Set();
+    for(const raw of arr){
+      const key=getId(raw)!=null
+        ? `id:${getId(raw)}`
+        : `name:${(getName(raw)||"").toLowerCase()}|${getRank(raw)}`;
+      if(seenTaxa.has(key)) continue;
+      seenTaxa.add(key);
+      dedup.push(raw);
+    }
+    arr=dedup;
+
     const cap=Math.min(MAX_CHILDREN,drawLimit||MAX_CHILDREN);
     n.hiddenCount=Math.max(0,arr.length-cap);
     n.children=arr.slice(0,cap).map(x=>makeNode(x,n));
@@ -1709,6 +1903,8 @@
 
       state.roots=arr.map(x=>makeNode(x));
       state.selected=null;
+      state.searchPathIds=new Set();
+      state.searchTargetId=null;
       renderGeoTimeline(null);
 
       await hydrateJapaneseNodes(state.roots,6);
@@ -1835,20 +2031,38 @@
 
   function computeLayout(){
     let leaf=0;
+
+    // Ages must be assigned after the currently visible tree is known.
+    assignTimelineAges();
+
     function rec(n,depth){
       const kids=(n.expanded && n.children && n.children.length)?n.children:null;
       let y;
+
       if(kids){
         const ys=kids.map(c=>rec(c,depth+1).y);
         y=(ys[0]+ys[ys.length-1])/2;
       }else{
-        y=leaf*DY; leaf++;
+        y=leaf*DY;
+        leaf++;
       }
-      n._x=depth*DX; n._y=y;
+
+      const age=Number.isFinite(n._layoutAge) ? n._layoutAge : 0;
+      n._timeX=ageToWorldX(age);
+      n._x=n._timeX-NODE_W/2;
+      n._y=y;
       return {x:n._x,y:n._y};
     }
-    for(const r of state.roots){rec(r,0); leaf+=0.35}
-    return {width:Math.max(700,...flattenVisible().map(x=>x.n._x+NODE_W+100)),height:Math.max(450,leaf*DY+120)};
+
+    for(const r of state.roots){
+      rec(r,0);
+      leaf+=0.35;
+    }
+
+    return {
+      width:ageToWorldX(0)+NODE_W+200,
+      height:Math.max(450,leaf*DY+120)
+    };
   }
 
   function render(){
@@ -1863,7 +2077,11 @@
         const path=document.createElementNS("http://www.w3.org/2000/svg","path");
         const mx=(x1+x2)/2;
         path.setAttribute("d",`M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`);
-        path.setAttribute("class","link "+((state.mode==="phylogeny"||PHYLO_NAMES.has(n.name)||PHYLO_NAMES.has(p.name))?"":"classification"));
+        const isSearchPath=state.searchPathIds?.has(String(p.id)) &&
+          state.searchPathIds?.has(String(n.id));
+        let cls="link "+((state.mode==="phylogeny"||PHYLO_NAMES.has(n.name)||PHYLO_NAMES.has(p.name))?"":"classification");
+        if(isSearchPath) cls+=" searchPath";
+        path.setAttribute("class",cls);
         stage.appendChild(path);
       }
     }
@@ -1879,7 +2097,10 @@
 
     const rect=document.createElementNS("http://www.w3.org/2000/svg","rect");
     rect.setAttribute("width",NODE_W); rect.setAttribute("height",NODE_H); rect.setAttribute("rx",11);
-    rect.setAttribute("class","nodeBox"+(state.selected===n?" selected":""));
+    let rectClass="nodeBox"+(state.selected===n?" selected":"");
+    if(state.searchPathIds?.has(String(n.id))) rectClass+=" searchPath";
+    if(String(state.searchTargetId||"")===String(n.id)) rectClass+=" searchTarget";
+    rect.setAttribute("class",rectClass);
     rect.addEventListener("click",ev=>{
       if(Date.now()<suppressClickUntil){ev.preventDefault();ev.stopPropagation();return;}
       ev.stopPropagation();
@@ -1895,12 +2116,24 @@
 
     const sub=document.createElementNS("http://www.w3.org/2000/svg","text");
     sub.setAttribute("x",12); sub.setAttribute("y",35); sub.setAttribute("class","nodeSub");
-    const subtxt=rankJa(n.rank)+(n.extinct===true?"・絶滅":"");
+    const sciSub=(shownName!==n.name && n.name && n.name!=="名称不明")
+      ? ` · ${n.name}` : "";
+    const subtxt=rankJa(n.rank)+(n.extinct===true?"・絶滅":"")+sciSub;
     sub.textContent=truncate(subtxt,31);
     g.appendChild(sub);
 
+    if(n._timeInferred){
+      const inf=document.createElementNS("http://www.w3.org/2000/svg","text");
+      inf.setAttribute("x",NODE_W-8);
+      inf.setAttribute("y",11);
+      inf.setAttribute("text-anchor","end");
+      inf.setAttribute("class","nodeTimeInferred");
+      inf.textContent="年代位置≈";
+      g.appendChild(inf);
+    }
+
     const a=AGE[n.name];
-    if(a){
+    if(a && !n._timeInferred){
       const age=document.createElementNS("http://www.w3.org/2000/svg","text");
       age.setAttribute("x",NODE_W-8); age.setAttribute("y",11); age.setAttribute("text-anchor","end"); age.setAttribute("class","nodeAge");
       age.textContent=a.label;
@@ -2327,66 +2560,115 @@
     return chain;
   }
 
+  function sameTaxon(n,raw){
+    const a=String(n?.id??"");
+    const b=String(getId(raw)??"");
+    if(a && b && a===b) return true;
+
+    const nn=String(n?.name||"").toLowerCase();
+    const rn=String(getName(raw)||"").toLowerCase();
+    return !!nn && !!rn && nn===rn && getRank(n.raw)===getRank(raw);
+  }
+
+  function findChainStart(chainRaw){
+    for(let i=0;i<chainRaw.length;i++){
+      const hit=state.roots.find(r=>sameTaxon(r,chainRaw[i]));
+      if(hit) return {index:i,node:hit};
+    }
+    return null;
+  }
+
+  async function openNormalTreeAlong(chainRaw,targetRaw){
+    if(!state.roots.length) await loadRoots();
+
+    const start=findChainStart(chainRaw);
+    if(!start) throw new Error("No classification root matched current tree");
+
+    let current=start.node;
+    const pathNodes=[current];
+
+    for(let i=start.index+1;i<chainRaw.length;i++){
+      const raw=chainRaw[i];
+
+      if(current.children===null){
+        await ensureChildren(current,MAX_CHILDREN);
+      }
+      current.expanded=true;
+
+      let child=(current.children||[]).find(c=>sameTaxon(c,raw));
+
+      // Very large parents may truncate children for rendering. Search can inject
+      // the exact path node while preserving all normally loaded siblings.
+      if(!child){
+        child=makeNode(raw,current);
+        child.searchInjected=true;
+        await hydrateJapaneseNodes([child],1);
+        current.children=current.children||[];
+        current.children.push(child);
+      }
+
+      pathNodes.push(child);
+      current=child;
+    }
+
+    state.searchPathIds=new Set(pathNodes.map(n=>String(n.id)));
+    state.searchTargetId=String(current.id);
+    state.selected=current;
+
+    render();
+    centerNode(current);
+    renderGeoTimeline(current);
+    await loadDetails(current);
+
+    return pathNodes;
+  }
+
   async function jumpToSearchResult(x){
     if(state.mode==="phylogeny"){
+      // Phylogeny mode still uses OpenTree topology, but the target route is
+      // highlighted after loading the local phylogenetic neighbourhood.
       await loadPhylogenyForUsage(x);
       return;
     }
 
     const rawId=getId(x);
     if(rawId==null){
-      setStatus("検索結果に分類IDがありません。偽のノードは作成しませんでした。");
+      setStatus("検索結果に分類IDがありません。");
       return;
     }
 
-    const id=String(rawId);
-    showLoading(true,"分類経路を組み立て中…");
+    showLoading(true,"通常の分類樹を目的地まで展開中…");
 
     try{
-      let path=classificationFrom(x.classification ? {classification:x.classification} : null);
+      let path=classificationFrom(
+        x.classification ? {classification:x.classification} : null
+      );
 
       if(!path.length){
-        const treeData=await fetchJSON(`${API}${DATASET}/tree/${encodeURIComponent(id)}`).catch(()=>null);
+        const treeData=await fetchJSON(
+          `${API}${DATASET}/tree/${encodeURIComponent(rawId)}`
+        ).catch(()=>null);
         path=classificationFrom(treeData);
       }
 
       if(!path.length){
-        const classData=await fetchJSON(`${API}${DATASET}/taxon/${encodeURIComponent(id)}/classification`).catch(()=>null);
+        const classData=await fetchJSON(
+          `${API}${DATASET}/taxon/${encodeURIComponent(rawId)}/classification`
+        ).catch(()=>null);
         path=classificationFrom(classData);
       }
 
       const chainRaw=normalizeClassification(path,x);
-
       if(chainRaw.length<2){
-        setStatus(`「${japaneseFromUsage(x)||getName(x)||"検索結果"}」の分類経路を取得できませんでした。単独ノードは作成しません。`);
+        setStatus("分類経路を取得できませんでした。");
         return;
       }
 
-      const chain=chainRaw.map(p=>makeNode(p));
-      const jpHit=japaneseFromUsage(x);
-      if(jpHit) chain[chain.length-1].common.ja=jpHit;
-
-      setStatus("分類経路の日本語名を確認中…");
-      await hydrateJapaneseNodes(chain,8);
-
-      for(let i=0;i<chain.length-1;i++){
-        chain[i].children=[chain[i+1]];
-        chain[i].expanded=true;
-        chain[i+1].parent=chain[i];
-      }
-
-      state.roots=[chain[0]];
-      const n=chain[chain.length-1];
-      state.selected=n;
-      render();
-
-      state.transform.k=Math.max(.82,Math.min(1.15,state.transform.k));
-      centerNode(n);
-      await selectNode(n);
-      setStatus(`分類経路: ${chain.map(c=>displayName(c)).join(" → ")}`);
+      const nodes=await openNormalTreeAlong(chainRaw,x);
+      setStatus(`検索ルート：${nodes.map(displayName).join(" → ")}`);
     }catch(e){
       console.error(e);
-      setStatus("分類経路の取得でエラーが発生しました。単独ノードは作成していません。");
+      setStatus("検索ルートの展開に失敗しました。");
     }finally{
       showLoading(false);
     }
@@ -2516,8 +2798,16 @@
       })(root);
 
       state.selected=target||root;
+
+      // Highlight lineage from the visible phylogenetic root to the target.
+      const route=[];
+      let q=state.selected;
+      while(q){route.push(q);q=q.parent;}
+      state.searchPathIds=new Set(route.map(n=>String(n.id)));
+      state.searchTargetId=String(state.selected.id);
+
       render();
-      state.transform.k=.9;
+      state.transform.k=Math.max(.45,Math.min(1.4,state.transform.k||.9));
       centerNode(state.selected);
       setStatus(`系統樹：${jpName||sci}（Open Tree of Life / OTT ${tax.ott_id}）`);
       await selectNode(state.selected);
@@ -2698,10 +2988,11 @@
 
   function applyTransform(){
     stage.setAttribute("transform",`translate(${state.transform.x},${state.transform.y}) scale(${state.transform.k})`);
+    renderGeoTimeline(state.selected);
   }
   function zoom(factor,cx=svg.clientWidth/2,cy=svg.clientHeight/2){
     const old=state.transform.k;
-    const nk=Math.min(2.8,Math.max(.18,old*factor));
+    const nk=Math.min(12,Math.max(.008,old*factor));
     const wx=(cx-state.transform.x)/old, wy=(cy-state.transform.y)/old;
     state.transform.x=cx-wx*nk; state.transform.y=cy-wy*nk; state.transform.k=nk; applyTransform();
   }
@@ -2713,7 +3004,7 @@
     const sidePad=45, topPad=112, bottomPad=45;
     const aw=Math.max(100,svg.clientWidth-sidePad*2);
     const ah=Math.max(100,svg.clientHeight-topPad-bottomPad);
-    const k=Math.min(1.1,Math.max(.18,Math.min(aw/w,ah/h)));
+    const k=Math.min(1.25,Math.max(.008,Math.min(aw/w,ah/h)));
     state.transform.k=k;
     state.transform.x=sidePad-minX*k;
     state.transform.y=topPad-minY*k;
@@ -2802,7 +3093,7 @@
       if(!m)return;
 
       const ratio=m.distance/pinchStart.distance;
-      const nk=Math.min(3.8,Math.max(.12,pinchStart.startK*ratio));
+      const nk=Math.min(12,Math.max(.008,pinchStart.startK*ratio));
 
       // 最初に2本指でつまんだ「樹上の地点」が、
       // 現在の2本指の中心に居続けるように変換する。
