@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#08111f">
-<title>生命系統樹 β11 — Tree of Known Life</title>
+<title>生命系統樹 β12 — Tree of Known Life</title>
 <style>
   :root{
     --bg:#07101c; --panel:#0d1928; --panel2:#111f31; --line:#33516f;
@@ -232,7 +232,7 @@
 <body>
 <div id="app">
 <header>
-  <div class="brand">生命系統樹 <span class="muted">β11</span><small>Tree of Known Life — Catalogue of Life Explorer</small></div>
+  <div class="brand">生命系統樹 <span class="muted">β12</span><small>Tree of Known Life — Catalogue of Life Explorer</small></div>
   <div class="searchWrap">
     <input id="search" autocomplete="off" placeholder="和名・学名・英名で検索　例：シャチ / Orcinus orca / killer whale">
     <button id="searchBtn" title="検索">⌕</button>
@@ -895,7 +895,11 @@
   }
 
   function displayName(n){
-    return n?.common?.ja || manualJa(n?.name) || n?.name || "—";
+    if(n?.common?.ja) return n.common.ja;
+    const manual=manualJa(n?.name);
+    if(manual) return manual;
+    if(n?.namePending) return "日本語名確認中…";
+    return n?.name || "—";
   }
 
   function readableTaxonName(name){
@@ -1826,6 +1830,7 @@
       extinct:(raw?.extinct===true?true:(raw?.extinct===false?false:undefined)),
       temporalRangeStart:raw?.temporalRangeStart ?? null,
       temporalRangeEnd:raw?.temporalRangeEnd ?? null,
+      namePending:false,
       common:{ja:manualJa(name),en:null,kana:null}
     };
   }
@@ -1855,13 +1860,33 @@
     n.hiddenCount=Math.max(0,arr.length-cap);
     n.children=arr.slice(0,cap).map(x=>makeNode(x,n));
 
-    // 表示前に日本語名を先読み。タップ後に名称が変わるのを防ぐ。
-    if(n.children.length){
-      setStatus(`${displayName(n)}：日本語名を確認中…`);
-      await hydrateJapaneseNodes(n.children,8);
+    // β12: never block branch expansion on external Japanese-name lookups.
+    // Unknown Japanese names render as a temporary Japanese placeholder.
+    for(const c of n.children){
+      if(!c.common?.ja && !manualJa(c.name)) c.namePending=true;
     }
 
     return n.children;
+  }
+
+  async function hydrateChildrenInBackground(parent){
+    const kids=parent?.children || [];
+    if(!kids.length) return;
+
+    try{
+      await hydrateJapaneseNodes(kids,5);
+    }catch(e){
+      console.warn("background Japanese hydration failed",e);
+    }finally{
+      for(const c of kids) c.namePending=false;
+
+      // Names do not change topology. Preserve current camera exactly.
+      const camera={...state.transform};
+      render();
+      state.transform={...camera};
+      applyTransform();
+      setStatus(`${displayName(parent)}：日本語名の確認完了`);
+    }
   }
 
   async function mapLimit(items, limit, fn){
@@ -2013,6 +2038,7 @@
 
   async function loadChildren(n){
     if(n.placeholder) return;
+
     if(n.raw?.phylo){
       await loadPhyloChildren(n);
       return;
@@ -2022,23 +2048,38 @@
       n.expanded=!n.expanded;
       renderKeepingNode(n,{revealChildren:n.expanded});
       setStatus(`${displayName(n)}：${n.expanded?"展開":"折りたたみ"}`);
+
+      if(n.expanded && n.children.some(c=>c.namePending)){
+        void hydrateChildrenInBackground(n);
+      }
       return;
     }
 
     n.loading=true;
+    setStatus(`${displayName(n)}：子ノードを取得中…`);
     renderKeepingNode(n);
+
     try{
       const kids=await ensureChildren(n,MAX_CHILDREN);
+
+      // Critical: make children visible BEFORE any secondary metadata/name calls.
       n.expanded=true;
-      setStatus(`${displayName(n)}：子ノード ${kids.length+n.hiddenCount} 件${n.hiddenCount?`（描画は先頭${kids.length}件。検索で全件へ到達可）`:""}`);
+      n.loading=false;
+      renderKeepingNode(n,{revealChildren:true});
+
+      setStatus(`${displayName(n)}：子ノード ${kids.length+n.hiddenCount} 件を展開${
+        n.hiddenCount?`（${n.hiddenCount}件は検索で到達可）`:""
+      }`);
+
+      // Japanese names and extinct/time metadata continue without blocking UI.
+      void hydrateChildrenInBackground(n);
     }catch(e){
       console.error(e);
-      n.children=[];
-      n.expanded=true;
-      setStatus(`${displayName(n)}：子ノード取得に失敗`);
-    }finally{
       n.loading=false;
-      renderKeepingNode(n,{revealChildren:n.expanded});
+      n.children=null;
+      n.expanded=false;
+      renderKeepingNode(n);
+      setStatus(`${displayName(n)}：子ノード取得に失敗`);
     }
   }
 
@@ -2189,12 +2230,37 @@
       const tg=document.createElementNS("http://www.w3.org/2000/svg","g");
       tg.setAttribute("transform",`translate(${NODE_W+15},${NODE_H/2})`);
       tg.style.cursor="pointer";
+      tg.style.touchAction="manipulation";
+
+      const hit=document.createElementNS("http://www.w3.org/2000/svg","circle");
+      hit.setAttribute("r",20);
+      hit.setAttribute("fill","transparent");
+      hit.setAttribute("pointer-events","all");
+      tg.appendChild(hit);
       const c=document.createElementNS("http://www.w3.org/2000/svg","circle");
       c.setAttribute("r",11); c.setAttribute("class","toggleCircle");
       const t=document.createElementNS("http://www.w3.org/2000/svg","text");
       t.setAttribute("class","toggleText"); t.textContent=n.loading?"…":(n.expanded?"−":"+");
       tg.appendChild(c); tg.appendChild(t);
-      tg.addEventListener("click",ev=>{ev.stopPropagation();loadChildren(n)});
+
+      let toggleHandledAt=0;
+      tg.addEventListener("pointerup",ev=>{
+        if(ev.pointerType==="touch" || ev.pointerType==="pen"){
+          ev.preventDefault();
+          ev.stopPropagation();
+          toggleHandledAt=Date.now();
+          void loadChildren(n);
+        }
+      });
+
+      tg.addEventListener("click",ev=>{
+        ev.preventDefault();
+        ev.stopPropagation();
+        // iOS may synthesize click after pointerup; avoid opening twice.
+        if(Date.now()-toggleHandledAt<700) return;
+        void loadChildren(n);
+      });
+
       g.appendChild(tg);
     }
 
