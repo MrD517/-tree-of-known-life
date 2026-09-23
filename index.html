@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#08111f">
-<title>生命系統樹 β15 — Tree of Known Life</title>
+<title>生命系統樹 β16 — Tree of Known Life</title>
 <style>
   :root{
     --bg:#07101c; --panel:#0d1928; --panel2:#111f31; --line:#33516f;
@@ -237,7 +237,7 @@
 <body>
 <div id="app">
 <header>
-  <div class="brand">生命系統樹 <span class="muted">β15</span><small>Tree of Known Life — Catalogue of Life Explorer</small></div>
+  <div class="brand">生命系統樹 <span class="muted">β16</span><small>Tree of Known Life — Catalogue of Life Explorer</small></div>
   <div class="searchWrap">
     <input id="search" autocomplete="off" placeholder="和名・学名・英名で検索　例：シャチ / Orcinus orca / killer whale">
     <button id="searchBtn" title="検索">⌕</button>
@@ -276,7 +276,7 @@
     <div class="legendRow tiny"><span class="legendLine"></span> 系統として補足済みの主要枝</div>
     <div class="legendRow tiny"><span class="legendLine dashed"></span> CoL分類上の親子関係</div>
     <div class="legendRow tiny"><span class="legendLine" style="border-top-color:#ff9f43;border-top-width:3px"></span> 検索した生物までのルート</div>
-    <div class="tiny muted">＋を押すと枝を展開。ノードを押すと名称・年代・出典を表示します。スマホでは1本指ドラッグで移動、2本指ピンチで拡大・縮小できます。拡大するほど年代方向と上下方向のノード間隔も追加で広がるため、密集した枝をほどいて読めます。</div>
+    <div class="tiny muted">＋を押すと枝を展開。ノードを押すと名称・年代・出典を表示します。スマホでは1本指ドラッグで移動、2本指ピンチで拡大・縮小できます。拡大すると箱そのものだけでなく、年代方向の横間隔と上下の枝間隔がさらに強く広がります。年代未詳ノードは重ならないための表示用補間を行います。</div>
   </div>
 
   <div class="section">
@@ -300,7 +300,7 @@
       <li>系統樹の無名内部ノードは「A系統・B系統の分岐点」のような説明名を自動生成します。正式な学名ではありません。</li>
       <li>細菌・古細菌などでは水平遺伝子移動が多く、進化史は完全な一本の「木」で表せない場合があります。</li>
       <li>上部の地質年代タイムラインはICS 2026/06準拠です。選択ノードの年代に応じて「地球史 → 顕生代 → 新生代 → 第四紀」と自動的に拡大します。枝の横幅そのものは年代比例ではありません。</li>
-      <li>表示名は日本語優先です。確認済み内蔵名称 → Catalogue of Lifeの日本語俗名 → GBIFの日本語俗名 → iNaturalistの日本語名（学名完全一致・locale=ja）の順に照合します。どこにも日本語名を確認できない場合だけ学名のまま表示し、自動翻訳・中国語ラベル・Wikipedia検索結果は使いません。</li>
+      <li>表示名は日本語優先です。確認済み内蔵名称 → Catalogue of Lifeの日本語俗名 → GBIFの日本語俗名（学名完全一致）の順に照合します。どこにも日本語名を確認できない場合だけ学名のまま表示し、自動翻訳・中国語ラベル・Wikipedia検索結果は使いません。</li>
       <li>Catalogue of Lifeが絶滅フラグを持つ分類群は「†」と「絶滅」を表示します。化石年代の収録には差があるため、絶滅年代が不明な場合は不明のままです。</li>
       <li>ウイルスは「生物か」の定義が議論されるため、CoLに含まれる分類は表示しますが生命樹上の扱いには注意が必要です。</li>
     </ol>
@@ -386,7 +386,7 @@
   const OT_API = "https://api.opentreeoflife.org/v3/";
   let DATASET = "316165";
   const MAX_CHILDREN = 220;
-  const NODE_W = 250, NODE_H = 62, DX = 310, DY = 88;
+  const NODE_W = 260, NODE_H = 64, DX = 360, DY = 132;
 
   // Major divergence nodes only. Values are broad literature-scale guides, not fabricated per taxon.
   // min/max = million years ago. "label" is intentionally a range when literature varies.
@@ -805,6 +805,9 @@
     "Sipuncula":"星口動物",
     "Phoronida":"箒虫動物",
     "Echiura":"ユムシ動物",
+    "Chondrostei":"軟質亜綱",
+    "Cyclorhagida":"円蓋綱",
+    "Allomalorhagida":"異蓋綱",
   };
 
   const JP_RANK = {
@@ -1065,14 +1068,17 @@
   }
 
   function semanticSpread(k=state.transform.k){
-    // k controls the size of nodes. This second factor controls the
-    // extra space BETWEEN nodes, so zooming in "untangles" dense clades.
-    const base=.80;
-    return Math.max(.72,Math.min(5.5,Math.pow(Math.max(.08,k)/base,.72)));
+    // Horizontal chronology spread.
+    // Even near normal zoom we intentionally keep a lot of breathing room.
+    const ratio=Math.max(.08,k)/.80;
+    return Math.max(1.8,Math.min(14,2.8*Math.pow(ratio,.96)));
   }
 
   function verticalSpread(k=state.transform.k){
-    return Math.max(.82,Math.min(3.1,Math.pow(semanticSpread(k),.58)));
+    // Vertical branch spacing also grows with zoom, but slightly less aggressively
+    // than the chronological X axis.
+    const ratio=Math.max(.08,k)/.80;
+    return Math.max(1.35,Math.min(8,1.75*Math.pow(ratio,.84)));
   }
 
   function ageToWorldX(age,k=state.transform.k){
@@ -1157,10 +1163,13 @@
         if(parentAge!==null && descendant!==null && parentAge>=descendant){
           n._layoutAge=(parentAge+descendant)/2;
         }else if(parentAge!==null){
-          // No actual date is known here. Keep the display position only a
-          // modest distance younger than the parent. This avoids inventing
-          // huge pseudo-dates and keeps a newly opened branch locally readable.
-          const layoutStep=Math.min(50,Math.max(.05,parentAge*.02));
+          // Undated nodes are display-only estimates. Give them enough time-axis
+          // separation that their boxes cannot sit on top of their parent.
+          const spread=semanticSpread(state.transform.k);
+          const visualGap=(NODE_W+180)*Math.pow(spread,.40);
+          const minAgeStep=visualGap/(TIME_PX_PER_MA*spread);
+          const naturalStep=Math.min(80,Math.max(.05,parentAge*.025));
+          const layoutStep=Math.max(minAgeStep,naturalStep);
           n._layoutAge=Math.max(0,parentAge-layoutStep);
         }else if(descendant!==null){
           n._layoutAge=Math.min(TIME_MAX_MA,descendant+Math.max(20,descendant*.35));
@@ -1184,10 +1193,19 @@
     function order(n){
       for(const c of (n.children||[])){
         if(!n.expanded) continue;
+        const spread=semanticSpread(state.transform.k);
+        const visualGap=(NODE_W+150)*Math.pow(spread,.35);
+        const minAgeStep=visualGap/(TIME_PX_PER_MA*spread);
+
         if(c._layoutAge>=n._layoutAge){
-          c._layoutAge=Math.max(0,n._layoutAge*.88);
+          c._layoutAge=Math.max(0,n._layoutAge-minAgeStep);
           c._timeInferred=true;
           c._timeSource="親子順序を保つ表示用補間";
+        }else if((c._timeInferred || n._timeInferred) &&
+                 (n._layoutAge-c._layoutAge)<minAgeStep){
+          c._layoutAge=Math.max(0,n._layoutAge-minAgeStep);
+          c._timeInferred=true;
+          c._timeSource="重なり回避の表示用補間";
         }
         order(c);
       }
@@ -1561,7 +1579,7 @@
     return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));
   }
 
-  const JP_CACHE_VERSION = "jp-v7";
+  const JP_CACHE_VERSION = "jp-v8";
 
   function jpCacheKey(kind,idOrName){
     return `lifeTree:${JP_CACHE_VERSION}:${DATASET}:${kind}:${String(idOrName||"")}`;
@@ -1587,7 +1605,7 @@
     }catch(_){}
   }
 
-  function findJapaneseVernacular(rows,sci=""){
+  function findJapaneseVernacular(rows,sci="",rank=""){
     const arr=Array.isArray(rows) ? rows : listFrom(rows);
     if(!arr.length) return null;
 
@@ -1601,6 +1619,7 @@
       if(SIMPLIFIED_ONLY_RE.test(name)) return false;
       if(badArticle.test(name)) return false;
       if(GENERIC_EXTERNAL_JA.has(name) && manualJa(sci)!==name) return false;
+      if(!strictJapaneseCandidate(name,sci,rank,"col")) return false;
       return true;
     });
 
@@ -1674,16 +1693,46 @@
     }
   }
 
-  function strictJapaneseCandidate(name,sci=""){
+  function strictJapaneseCandidate(name,sci="",rank="",source="external"){
     const v=String(name||"").trim();
+    const r=String(rank||"").toLowerCase();
+
     if(!v || !hasJapanese(v)) return null;
     if(SIMPLIFIED_ONLY_RE.test(v)) return null;
     if(/分類学|taxonomy|^門[（(]|^綱[（(]|^目[（(]|^科[（(]|^属[（(]|^種[（(]/i.test(v)) return null;
     if(GENERIC_EXTERNAL_JA.has(v) && manualJa(sci)!==v) return null;
+
+    // Obvious machine/Chinese-like constructions seen in aggregators.
+    if(/動物動物|植物植物|真海豚|真海豚|海豚$|鲸|鲨|鱼|龟|龙/.test(v)) return null;
+
+    // For lower ranks, a Japanese common name normally contains kana.
+    // Kanji-only external labels are too easy to confuse with Chinese names,
+    // so keep the scientific name instead unless we curated it ourselves.
+    const lowerRanks=new Set([
+      "species","subspecies","variety","form","strain",
+      "genus","subgenus","family","subfamily"
+    ]);
+    if(source!=="curated" && lowerRanks.has(r) && !hasKana(v)){
+      return null;
+    }
+
+    // For formal higher ranks, allow kanji-only names only if their suffix
+    // matches the rank. This keeps 半索動物門 etc. but rejects random labels.
+    const suffixByRank={
+      "phylum":"門","subphylum":"亜門",
+      "class":"綱","subclass":"亜綱",
+      "order":"目","suborder":"亜目",
+      "family":"科","subfamily":"亜科",
+      "genus":"属","subgenus":"亜属"
+    };
+    if(source!=="curated" && !hasKana(v) && suffixByRank[r] && !v.endsWith(suffixByRank[r])){
+      return null;
+    }
+
     return v;
   }
 
-  async function gbifJapaneseName(sci){
+  async function gbifJapaneseName(sci,rank=""){
     if(!sci) return null;
 
     const cached=getCachedJapanese("gbif-ja",sci);
@@ -1719,10 +1768,10 @@
         const lang=String(v?.language||v?.lang||"").toLowerCase();
         const name=v?.vernacularName ?? v?.name ?? "";
         return /^(ja|jpn|japanese)$/.test(lang) &&
-          !!strictJapaneseCandidate(name,sci);
+          !!strictJapaneseCandidate(name,sci,rank,"gbif");
       });
 
-      const jp=found ? strictJapaneseCandidate(found.vernacularName ?? found.name,sci) : null;
+      const jp=found ? strictJapaneseCandidate(found.vernacularName ?? found.name,sci,rank,"gbif") : null;
       setCachedJapanese("gbif-ja",sci,jp);
       return jp;
     }catch(e){
@@ -1756,7 +1805,7 @@
     }
   }
 
-  async function resolveJapaneseName(sci,id=null){
+  async function resolveJapaneseName(sci,id=null,rank=""){
     const manual=manualJa(sci);
     if(manual) return {name:manual,source:"確認済み日本語辞書"};
 
@@ -1770,7 +1819,7 @@
     if(id){
       try{
         const data=await fetchJSON(`${API}${DATASET}/taxon/${encodeURIComponent(id)}/vernacular`);
-        const jp=findJapaneseVernacular(data,sci);
+        const jp=findJapaneseVernacular(data,sci,rank);
         if(jp){
           setCachedJapanese("resolved-strict-ja",cacheKey,jp);
           return {name:jp,source:"Catalogue of Life"};
@@ -1781,17 +1830,10 @@
     }
 
     // 2. GBIF — exact scientific-name match + explicitly Japanese vernacular.
-    const gb=await gbifJapaneseName(sci);
+    const gb=await gbifJapaneseName(sci,rank);
     if(gb){
       setCachedJapanese("resolved-strict-ja",cacheKey,gb);
       return {name:gb,source:"GBIF"};
-    }
-
-    // 3. iNaturalist — exact scientific-name match, locale=ja.
-    const ina=await inatJapaneseName(sci);
-    if(ina){
-      setCachedJapanese("resolved-strict-ja",cacheKey,ina);
-      return {name:ina,source:"iNaturalist"};
     }
 
     // Never machine-translate taxonomic names.
@@ -1810,7 +1852,7 @@
     const id=getId(n.raw) || n.id;
     const usableId=(!id || String(id).startsWith("virtual-")) ? null : id;
 
-    const resolved=await resolveJapaneseName(sci,usableId);
+    const resolved=await resolveJapaneseName(sci,usableId,n.rank);
     if(resolved?.name){
       n.common.ja=resolved.name;
       n.common.jaSource=resolved.source;
@@ -1866,7 +1908,7 @@
     let usage=await exactColUsageForScientificName(sci);
     let id=getId(usage);
 
-    const resolved=await resolveJapaneseName(sci,id||null);
+    const resolved=await resolveJapaneseName(sci,id||null,n.rank);
     if(resolved?.name){
       n.common.ja=resolved.name;
       n.common.jaSource=resolved.source;
@@ -2701,7 +2743,7 @@
         if(japaneseFromUsage(row) || manualJa(getName(row))) return;
         const sci=getName(row);
         if(!sci) return;
-        const resolved=await resolveJapaneseName(sci,getId(row)||null);
+        const resolved=await resolveJapaneseName(sci,getId(row)||null,getRank(row));
         if(resolved?.name) row._ja=resolved.name;
       });
 
