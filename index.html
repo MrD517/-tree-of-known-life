@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#08111f">
-<title>生命系統樹 β7 — Tree of Known Life</title>
+<title>生命系統樹 β8 — Tree of Known Life</title>
 <style>
   :root{
     --bg:#07101c; --panel:#0d1928; --panel2:#111f31; --line:#33516f;
@@ -178,7 +178,7 @@
 <body>
 <div id="app">
 <header>
-  <div class="brand">生命系統樹 <span class="muted">β7</span><small>Tree of Known Life — Catalogue of Life Explorer</small></div>
+  <div class="brand">生命系統樹 <span class="muted">β8</span><small>Tree of Known Life — Catalogue of Life Explorer</small></div>
   <div class="searchWrap">
     <input id="search" autocomplete="off" placeholder="和名・学名・英名で検索　例：シャチ / Orcinus orca / killer whale">
     <button id="searchBtn" title="検索">⌕</button>
@@ -240,7 +240,7 @@
       <li>系統樹の無名内部ノードは「A系統・B系統の分岐点」のような説明名を自動生成します。正式な学名ではありません。</li>
       <li>細菌・古細菌などでは水平遺伝子移動が多く、進化史は完全な一本の「木」で表せない場合があります。</li>
       <li>分岐年代は研究で推定値が得られる主要節のみ表示します。未確定の場所へ架空の数字は入れません。</li>
-      <li>表示名は日本語優先です。Catalogue of Lifeに日本語俗名がある場合はノードを描く前に取得し、日本語が見つからない場合だけ学名を表示します。</li>
+      <li>表示名は日本語優先です。内蔵辞書 → Catalogue of Life → Wikidata → 日本語Wikipediaの順に日本語名を探し、それでも見つからない場合だけ学名を表示します。Wikidata/Wikipediaは表示名補完用で、分類そのものの根拠には使いません。</li>
       <li>ウイルスは「生物か」の定義が議論されるため、CoLに含まれる分類は表示しますが生命樹上の扱いには注意が必要です。</li>
     </ol>
   </div>
@@ -528,6 +528,83 @@
     "Paranthropus":"パラントロプス属",
     "Ardipithecus":"アルディピテクス属",
     "Sahelanthropus":"サヘラントロプス属",
+    "Neopterygii":"新鰭類",
+    "Teleostei":"真骨類",
+    "Osteoglossomorpha":"骨舌魚類",
+    "Elopomorpha":"カライワシ類",
+    "Clupeocephala":"ニシン・骨鰾類",
+    "Otomorpha":"骨鰾類",
+    "Ostariophysi":"骨鰾上目",
+    "Euteleostei":"正真骨類",
+    "Neoteleostei":"新真骨類",
+    "Acanthomorpha":"棘鰭類",
+    "Acanthopterygii":"棘鰭上目",
+    "Percomorpha":"スズキ系類",
+    "Acipenseriformes":"チョウザメ目",
+    "Albuliformes":"ソトイワシ目",
+    "Anguilliformes":"ウナギ目",
+    "Ateleopodiformes":"シャチブリ目",
+    "Atheriniformes":"トウゴロウイワシ目",
+    "Batrachoidiformes":"ガマアンコウ目",
+    "Beloniformes":"ダツ目",
+    "Beryciformes":"キンメダイ目",
+    "Characiformes":"カラシン目",
+    "Clupeiformes":"ニシン目",
+    "Cypriniformes":"コイ目",
+    "Cyprinodontiformes":"カダヤシ目",
+    "Elopiformes":"カライワシ目",
+    "Esociformes":"カワカマス目",
+    "Gadiformes":"タラ目",
+    "Galaxiiformes":"ギャラクシアス目",
+    "Gasterosteiformes":"トゲウオ目",
+    "Gobiesociformes":"ウバウオ目",
+    "Gobiiformes":"ハゼ目",
+    "Gonorynchiformes":"ネズミギス目",
+    "Gymnotiformes":"デンキウナギ目",
+    "Lampriformes":"アカマンボウ目",
+    "Lophiiformes":"アンコウ目",
+    "Mugiliformes":"ボラ目",
+    "Mulliformes":"ヒメジ目",
+    "Myctophiformes":"ハダカイワシ目",
+    "Notacanthiformes":"ソコギス目",
+    "Ophidiiformes":"アシロ目",
+    "Osmeriformes":"キュウリウオ目",
+    "Osteoglossiformes":"アロワナ目",
+    "Perciformes":"スズキ目",
+    "Pleuronectiformes":"カレイ目",
+    "Polypteriformes":"ポリプテルス目",
+    "Salmoniformes":"サケ目",
+    "Scorpaeniformes":"カサゴ目",
+    "Siluriformes":"ナマズ目",
+    "Stomiiformes":"ワニトカゲギス目",
+    "Syngnathiformes":"ヨウジウオ目",
+    "Tetraodontiformes":"フグ目",
+    "Entognatha":"内顎類",
+    "Collembola":"トビムシ目",
+    "Diplura":"コムシ目",
+    "Protura":"カマアシムシ目",
+    "Chilopoda":"ムカデ綱",
+    "Diplopoda":"ヤスデ綱",
+    "Pauropoda":"エダヒゲムシ綱",
+    "Symphyla":"コムカデ綱",
+    "Archaeognatha":"イシノミ目",
+    "Zygentoma":"シミ目",
+    "Ephemeroptera":"カゲロウ目",
+    "Odonata":"トンボ目",
+    "Orthoptera":"バッタ目",
+    "Phasmatodea":"ナナフシ目",
+    "Mantodea":"カマキリ目",
+    "Blattodea":"ゴキブリ目",
+    "Dermaptera":"ハサミムシ目",
+    "Hemiptera":"カメムシ目",
+    "Thysanoptera":"アザミウマ目",
+    "Neuroptera":"アミメカゲロウ目",
+    "Coleoptera":"コウチュウ目",
+    "Diptera":"ハエ目",
+    "Lepidoptera":"チョウ目",
+    "Hymenoptera":"ハチ目",
+    "Trichoptera":"トビケラ目",
+    "Siphonaptera":"ノミ目",
   };
 
   const JP_RANK = {
@@ -863,7 +940,7 @@
     return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));
   }
 
-  const JP_CACHE_VERSION = "jp-v1";
+  const JP_CACHE_VERSION = "jp-v2";
 
   function jpCacheKey(kind,idOrName){
     return `lifeTree:${JP_CACHE_VERSION}:${DATASET}:${kind}:${String(idOrName||"")}`;
@@ -903,34 +980,133 @@
     return byChars ? vernName(byChars) : null;
   }
 
+  function looksLikeJapaneseTaxonLabel(label){
+    const v=String(label||"").trim();
+    if(!v || !hasJapanese(v)) return false;
+    if(v.length>45) return false;
+    return true;
+  }
+
+  function looksTaxonomicDescription(desc){
+    const v=String(desc||"");
+    if(!v) return true;
+    return /(分類|分類群|生物|動物|植物|菌|細菌|古細菌|魚|鳥|昆虫|節足|哺乳|爬虫|両生|軟体|属|科|目|綱|門|種|クレード|系統)/.test(v);
+  }
+
+  async function wikidataJapaneseName(sci){
+    if(!sci) return null;
+
+    const cached=getCachedJapanese("wikidata",sci);
+    if(cached!==undefined) return cached;
+
+    try{
+      const url="https://www.wikidata.org/w/api.php"+
+        `?action=wbsearchentities&search=${encodeURIComponent(sci)}`+
+        "&language=ja&uselang=ja&type=item&limit=8&format=json&origin=*";
+      const data=await fetchJSON(url);
+      const rows=Array.isArray(data?.search)?data.search:[];
+
+      const good=rows.find(x=>{
+        const label=String(x?.label||"");
+        const desc=String(x?.description||"");
+        return looksLikeJapaneseTaxonLabel(label) && looksTaxonomicDescription(desc);
+      });
+
+      const name=good?.label || null;
+      setCachedJapanese("wikidata",sci,name);
+      return name;
+    }catch(e){
+      console.warn("Wikidata Japanese-name lookup failed",sci,e);
+      return null;
+    }
+  }
+
+  async function wikipediaJapaneseName(sci){
+    if(!sci) return null;
+
+    const cached=getCachedJapanese("jawiki",sci);
+    if(cached!==undefined) return cached;
+
+    try{
+      const query=`"${sci}"`;
+      const url="https://ja.wikipedia.org/w/api.php"+
+        `?action=query&list=search&srsearch=${encodeURIComponent(query)}`+
+        "&srnamespace=0&srlimit=6&format=json&origin=*";
+      const data=await fetchJSON(url);
+      const rows=Array.isArray(data?.query?.search)?data.query.search:[];
+
+      const lower=sci.toLowerCase();
+      const good=rows.find(x=>{
+        const title=String(x?.title||"");
+        const snippet=stripHtml(x?.snippet||"").toLowerCase();
+        return looksLikeJapaneseTaxonLabel(title) && snippet.includes(lower);
+      });
+
+      const name=good?.title || null;
+      setCachedJapanese("jawiki",sci,name);
+      return name;
+    }catch(e){
+      console.warn("Japanese Wikipedia name lookup failed",sci,e);
+      return null;
+    }
+  }
+
+  async function resolveJapaneseName(sci,id=null){
+    const manual=manualJa(sci);
+    if(manual) return {name:manual,source:"内蔵日本語辞書"};
+
+    const cached=getCachedJapanese("resolved-ja",sci);
+    if(cached!==undefined){
+      return cached ? {name:cached,source:"キャッシュ"} : {name:null,source:null};
+    }
+
+    // 1. Catalogue of Life の日本語俗名
+    if(id){
+      try{
+        const data=await fetchJSON(`${API}${DATASET}/taxon/${encodeURIComponent(id)}/vernacular`);
+        const jp=findJapaneseVernacular(data);
+        if(jp){
+          setCachedJapanese("resolved-ja",sci,jp);
+          return {name:jp,source:"Catalogue of Life"};
+        }
+      }catch(e){
+        console.warn("CoL vernacular failed",id,e);
+      }
+    }
+
+    // 2. Wikidata の日本語ラベル
+    const wd=await wikidataJapaneseName(sci);
+    if(wd){
+      setCachedJapanese("resolved-ja",sci,wd);
+      return {name:wd,source:"Wikidata"};
+    }
+
+    // 3. 日本語Wikipediaの記事名（最終表示補完）
+    const wp=await wikipediaJapaneseName(sci);
+    if(wp){
+      setCachedJapanese("resolved-ja",sci,wp);
+      return {name:wp,source:"日本語Wikipedia"};
+    }
+
+    setCachedJapanese("resolved-ja",sci,null);
+    return {name:null,source:null};
+  }
+
   async function hydrateTaxonomyJapanese(n){
     if(!n || n.placeholder || n.raw?.phylo) return;
 
-    const manual=manualJa(n.name);
-    if(manual){
-      n.common.ja=manual;
-      return;
-    }
-
     if(n.common?.ja) return;
 
+    const sci=n.name || getName(n.raw);
+    if(!sci) return;
+
     const id=getId(n.raw) || n.id;
-    if(!id || String(id).startsWith("virtual-")) return;
+    const usableId=(!id || String(id).startsWith("virtual-")) ? null : id;
 
-    const cached=getCachedJapanese("taxon",id);
-    if(cached!==undefined){
-      if(cached) n.common.ja=cached;
-      return;
-    }
-
-    try{
-      const data=await fetchJSON(`${API}${DATASET}/taxon/${encodeURIComponent(id)}/vernacular`);
-      const jp=findJapaneseVernacular(data);
-      setCachedJapanese("taxon",id,jp);
-      if(jp) n.common.ja=jp;
-    }catch(e){
-      // Network errors are not cached as "none".
-      console.warn("vernacular lookup failed",id,e);
+    const resolved=await resolveJapaneseName(sci,usableId);
+    if(resolved?.name){
+      n.common.ja=resolved.name;
+      n.common.jaSource=resolved.source;
     }
   }
 
@@ -974,37 +1150,19 @@
     const sci=n.raw?.taxon?.name;
     if(!sci){
       n.common.ja=phyloInternalLabel(n);
-      return;
-    }
-
-    const manual=manualJa(sci);
-    if(manual){
-      n.common.ja=manual;
+      n.common.jaSource="系統関係から生成";
       return;
     }
 
     if(n.common?.ja) return;
 
-    const cached=getCachedJapanese("sci-ja",sci);
-    if(cached!==undefined){
-      if(cached) n.common.ja=cached;
-      return;
-    }
+    let usage=await exactColUsageForScientificName(sci);
+    let id=getId(usage);
 
-    const usage=await exactColUsageForScientificName(sci);
-    const id=getId(usage);
-    if(!id){
-      setCachedJapanese("sci-ja",sci,null);
-      return;
-    }
-
-    try{
-      const data=await fetchJSON(`${API}${DATASET}/taxon/${encodeURIComponent(id)}/vernacular`);
-      const jp=findJapaneseVernacular(data);
-      setCachedJapanese("sci-ja",sci,jp);
-      if(jp) n.common.ja=jp;
-    }catch(e){
-      console.warn("phylo vernacular lookup failed",sci,e);
+    const resolved=await resolveJapaneseName(sci,id||null);
+    if(resolved?.name){
+      n.common.ja=resolved.name;
+      n.common.jaSource=resolved.source;
     }
   }
 
@@ -1426,6 +1584,7 @@
       ["Taxon ID",n.id],
       ["階級",rankJa(rank)],
       ["状態",statusJa(st)],
+      ["日本語表示",n.common?.jaSource||"内蔵/CoL"],
       ["絶滅",extinct?"はい":"いいえ/不明"],
       ["親",n.parent?displayName(n.parent):"根"],
       ["読み込んだ子",(n.children?.length??"未読込")+(n.hiddenCount?` + 非描画${n.hiddenCount}`:"")]
@@ -1580,23 +1739,12 @@
       const shown=uniq.slice(0,30);
 
       // 学名検索でも候補表示は最初から日本語優先。
-      await mapLimit(shown,8,async row=>{
+      await mapLimit(shown,5,async row=>{
         if(japaneseFromUsage(row) || manualJa(getName(row))) return;
-        const id=getId(row);
-        if(!id) return;
-
-        const cached=getCachedJapanese("taxon",id);
-        if(cached!==undefined){
-          if(cached) row._ja=cached;
-          return;
-        }
-
-        try{
-          const vd=await fetchJSON(`${API}${DATASET}/taxon/${encodeURIComponent(id)}/vernacular`);
-          const jp=findJapaneseVernacular(vd);
-          setCachedJapanese("taxon",id,jp);
-          if(jp) row._ja=jp;
-        }catch(_){}
+        const sci=getName(row);
+        if(!sci) return;
+        const resolved=await resolveJapaneseName(sci,getId(row)||null);
+        if(resolved?.name) row._ja=resolved.name;
       });
 
       showResults(shown,q);
@@ -1991,6 +2139,7 @@
       ["OpenTree node",n.raw?.phyloNodeId||"—"],
       ["OTT ID",n.raw?.ott_id??"—"],
       ["階級",rankJa(n.rank)],
+      ["日本語表示",n.common?.jaSource||"内蔵/外部補完"],
       ["子孫先端数",n.raw?.num_tips??"—"],
       ["支持ソース",supportCount],
       ["競合ソース",conflictCount],
