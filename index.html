@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#08111f">
-<title>生命系統樹 β10 — Tree of Known Life</title>
+<title>生命系統樹 β11 — Tree of Known Life</title>
 <style>
   :root{
     --bg:#07101c; --panel:#0d1928; --panel2:#111f31; --line:#33516f;
@@ -232,7 +232,7 @@
 <body>
 <div id="app">
 <header>
-  <div class="brand">生命系統樹 <span class="muted">β10</span><small>Tree of Known Life — Catalogue of Life Explorer</small></div>
+  <div class="brand">生命系統樹 <span class="muted">β11</span><small>Tree of Known Life — Catalogue of Life Explorer</small></div>
   <div class="searchWrap">
     <input id="search" autocomplete="off" placeholder="和名・学名・英名で検索　例：シャチ / Orcinus orca / killer whale">
     <button id="searchBtn" title="検索">⌕</button>
@@ -271,7 +271,7 @@
     <div class="legendRow tiny"><span class="legendLine"></span> 系統として補足済みの主要枝</div>
     <div class="legendRow tiny"><span class="legendLine dashed"></span> CoL分類上の親子関係</div>
     <div class="legendRow tiny"><span class="legendLine" style="border-top-color:#ff9f43;border-top-width:3px"></span> 検索した生物までのルート</div>
-    <div class="tiny muted">＋を押すと枝を展開。ノードを押すと名称・年代・出典を表示します。スマホでは1本指ドラッグで移動、2本指ピンチで拡大・縮小できます。枝の＋を押してもズーム倍率は変わりません。</div>
+    <div class="tiny muted">＋を押すと枝を展開。ノードを押すと名称・年代・出典を表示します。スマホでは1本指ドラッグで移動、2本指ピンチで拡大・縮小できます。枝の＋では倍率を変えず、子が画面外なら年代位置まで自動で横移動します。</div>
   </div>
 
   <div class="section">
@@ -1132,8 +1132,11 @@
         if(parentAge!==null && descendant!==null && parentAge>=descendant){
           n._layoutAge=(parentAge+descendant)/2;
         }else if(parentAge!==null){
-          // Move monotonically toward present without pretending this is a date.
-          n._layoutAge=Math.max(0,parentAge*0.62);
+          // No actual date is known here. Keep the display position only a
+          // modest distance younger than the parent. This avoids inventing
+          // huge pseudo-dates and keeps a newly opened branch locally readable.
+          const layoutStep=Math.min(50,Math.max(.05,parentAge*.02));
+          n._layoutAge=Math.max(0,parentAge-layoutStep);
         }else if(descendant!==null){
           n._layoutAge=Math.min(TIME_MAX_MA,descendant+Math.max(20,descendant*.35));
         }else{
@@ -1954,17 +1957,58 @@
     render(); fitTree();
   }
 
-  function renderKeepingNode(n){
-    // 枝展開前の「そのノードの画面上の位置」とズーム倍率を保存。
-    // レイアウトが変わっても同じ場所に残す。拡大率は絶対に変えない。
+  function childScreenCenter(c){
+    return {
+      x:state.transform.x+(c._x+NODE_W/2)*state.transform.k,
+      y:state.transform.y+(c._y+NODE_H/2)*state.transform.k
+    };
+  }
+
+  function revealExpandedChildren(n){
+    const kids=(n?.expanded && n?.children) ? n.children : [];
+    if(!kids.length) return;
+
+    const left=24, right=svg.clientWidth-70;
+    const top=96, bottom=svg.clientHeight-36;
+
+    // If even one child is already visible, respect the user's current view.
+    const anyVisible=kids.some(c=>{
+      const p=childScreenCenter(c);
+      return p.x>=left && p.x<=right && p.y>=top && p.y<=bottom;
+    });
+    if(anyVisible) return;
+
+    // Prefer a vertically central child so a large fan of children feels natural.
+    const sorted=[...kids].sort((a,b)=>a._y-b._y);
+    const target=sorted[Math.floor(sorted.length/2)];
+    const sp=childScreenCenter(target);
+
+    // Same zoom. Only pan. Put the new branch toward the right half of screen.
+    const tx=Math.max(110,svg.clientWidth*.68);
+    const usableTop=92;
+    const ty=usableTop+(svg.clientHeight-usableTop)*.48;
+
+    state.transform.x += tx-sp.x;
+    state.transform.y += ty-sp.y;
+    applyTransform();
+
+    setStatus(`${displayName(n)}：展開しました（年代位置へ移動）`);
+  }
+
+  function renderKeepingNode(n,{revealChildren=false}={}){
+    // Preserve zoom and the clicked node's screen position during relayout.
     const k=state.transform.k;
     const oldScreenX=state.transform.x+(n._x+NODE_W/2)*k;
     const oldScreenY=state.transform.y+(n._y+NODE_H/2)*k;
+
     render();
+
     state.transform.k=k;
     state.transform.x=oldScreenX-(n._x+NODE_W/2)*k;
     state.transform.y=oldScreenY-(n._y+NODE_H/2)*k;
     applyTransform();
+
+    if(revealChildren) revealExpandedChildren(n);
   }
 
   async function loadChildren(n){
@@ -1976,7 +2020,7 @@
 
     if(n.children!==null){
       n.expanded=!n.expanded;
-      renderKeepingNode(n);
+      renderKeepingNode(n,{revealChildren:n.expanded});
       setStatus(`${displayName(n)}：${n.expanded?"展開":"折りたたみ"}`);
       return;
     }
@@ -1994,7 +2038,7 @@
       setStatus(`${displayName(n)}：子ノード取得に失敗`);
     }finally{
       n.loading=false;
-      renderKeepingNode(n);
+      renderKeepingNode(n,{revealChildren:n.expanded});
     }
   }
 
